@@ -385,16 +385,13 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 }
 
 /* ── ZIP validation color ── */
+/* Always green outline when ZIP is exactly 5 digits (valid format) */
 .zip-valid [data-testid="stTextInput"] input {
     border-color: #1B7A48 !important;
     box-shadow: 0 0 0 3px rgba(27,122,72,0.12) !important;
     background: #F0FFF8 !important;
 }
-.zip-invalid [data-testid="stTextInput"] input {
-    border-color: #C62828 !important;
-    box-shadow: 0 0 0 3px rgba(198,40,40,0.10) !important;
-    background: #FFF5F5 !important;
-}
+/* No red for unrecognized — only green for valid 5-digit format */
 .zip-status {
     font-size: 12.5px;
     font-weight: 500;
@@ -403,7 +400,7 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
     padding: 0 2px;
 }
 .zip-status.ok  { color: #1B7A48; }
-.zip-status.err { color: #C62828; }
+.zip-status.warn { color: #B06A00; }
 
 /* ── Screening locations ── */
 .loc-grid {
@@ -450,6 +447,14 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
     margin-bottom: 12px;
     line-height: 1.55;
 }
+
+/* Hide spinner buttons ONLY for the age input */
+[data-testid="stNumberInput"]:has(input[aria-label="Age"]) button {
+    display: none !important;
+}
+[data-testid="stNumberInput"]:has(input[aria-label="Age"]) > div {
+    gap: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -462,27 +467,238 @@ if "started" not in st.session_state:
     st.session_state.started = False
 
 # ─────────────────────────────────────────
-#  ZIP DATA
+#  ZIP DATA — All Indiana ZIP codes (46xxx and 47xxx)
 # ─────────────────────────────────────────
 valid_zips = {
-    "46032","46033","46060","46062","46074","46077",
-    "46220","46240","46250","46256","46280","46290",
-    "46112","46142"
-}
-zip_to_latlon = {
-    "46032":(39.9784,-86.1180), "46033":(39.9990,-86.0820),
-    "46060":(40.0456,-86.0086), "46062":(40.0510,-86.0480),
-    "46074":(39.9630,-86.2620), "46077":(39.9510,-86.3500),
-    "46220":(39.8680,-86.1180), "46240":(39.9050,-86.1280),
-    "46250":(39.9130,-86.0700), "46256":(39.9000,-86.0200),
-    "46280":(39.9350,-86.1350), "46290":(39.9300,-86.1600),
-    "46112":(39.6890,-86.3990), "46142":(39.6130,-86.1260),
+    # ── Marion County / Indianapolis ──
+    "46201","46202","46203","46204","46205","46206","46207","46208",
+    "46209","46210","46211","46214","46216","46217","46218","46219",
+    "46220","46221","46222","46224","46225","46226","46227","46228",
+    "46229","46230","46231","46234","46235","46236","46237","46239",
+    "46240","46241","46242","46244","46247","46249","46250","46251",
+    "46253","46254","46255","46256","46259","46260","46262","46268",
+    "46274","46275","46277","46278","46280","46282","46283","46285",
+    "46290","46291","46295","46296","46298",
+    # ── Hamilton County (Carmel, Fishers, Noblesville, Westfield) ──
+    "46032","46033","46034","46036","46037","46038","46040","46055",
+    "46060","46061","46062","46063","46064","46074","46082",
+    # ── Hendricks County (Avon, Brownsburg, Plainfield) ──
+    "46077","46112","46113","46118","46121","46122","46123","46149",
+    "46158","46167",
+    # ── Johnson County (Greenwood, Franklin, Bargersville) ──
+    "46107","46131","46142","46143","46160","46161","46162","46163",
+    "46164","46181","46183","46184",
+    # ── Boone County (Lebanon, Zionsville) ──
+    "46052","46075","46077",
+    # ── Putnam County (Greencastle / DePauw University area) ──
+    "46105","46120","46124","46128","46135","46157","46165","46170",
+    "46172",
+    # ── Morgan County (Martinsville, Mooresville) ──
+    "46106","46151","46158","46166",
+    # ── Madison County (Anderson, Elwood) ──
+    "46001","46011","46012","46013","46014","46015","46016","46017",
+    "46030","46044","46045","46048","46049","46050","46051","46058",
+    "46065","46069","46070","46071","46072","46076",
+    # ── Hancock County (Greenfield) ──
+    "46140","46148","46150","46155","46156",
+    # ── Shelby County ──
+    "46176",
+    # ── Bartholomew County (Columbus) ──
+    "47201","47202","47203",
+    # ── Monroe County (Bloomington / IU) ──
+    "47401","47402","47403","47404","47405","47406","47407","47408",
+    # ── Tippecanoe County (Lafayette / Purdue) ──
+    "47901","47902","47903","47904","47905","47906","47907","47909",
+    # ── Allen County (Fort Wayne) ──
+    "46801","46802","46803","46804","46805","46806","46807","46808",
+    "46809","46814","46815","46816","46818","46819","46825","46835",
+    "46845","46850","46851","46852","46853","46854","46855","46856",
+    "46857","46858","46859","46860","46861","46862","46863","46864",
+    "46865","46866","46867","46868","46869","46885","46895","46896",
+    "46897","46898","46899",
+    # ── St. Joseph County (South Bend, Mishawaka) ──
+    "46530","46545","46550","46552","46554","46556","46560","46561",
+    "46563","46565","46567","46570","46571","46572","46573","46574",
+    "46580","46581","46582","46590","46595","46601","46604","46613",
+    "46614","46615","46616","46617","46619","46620","46624","46626",
+    "46628","46629","46634","46635","46637","46660","46680","46699",
+    # ── Lake County (Gary, Hammond, Crown Point) ──
+    "46301","46302","46303","46304","46320","46321","46322","46323",
+    "46324","46325","46327","46340","46341","46342","46345","46346",
+    "46347","46348","46349","46350","46351","46352","46355","46356",
+    "46373","46374","46375","46376","46377","46379","46380","46381",
+    "46382","46383","46384","46385","46390","46391","46392","46393",
+    "46394","46395","46396","46397","46398","46399","46401","46402",
+    "46403","46404","46405","46406","46407","46408","46409","46410",
+    "46411",
+    # ── Porter County (Valparaiso, Portage) ──
+    "46304","46341","46370","46371","46372","46373","46374","46375",
+    "46376","46382","46383","46384","46385","46390","46391","46392",
+    # ── Elkhart County (Elkhart, Goshen) ──
+    "46514","46515","46516","46517","46526","46527","46528",
+    # ── Kosciusko County (Warsaw) ──
+    "46580","46581","46582",
+    # ── LaPorte County (Michigan City, La Porte) ──
+    "46350","46352","46360","46361","46362","46365","46366","46367",
+    "46368","46369",
+    # ── Marshall County (Plymouth) ──
+    "46563",
+    # ── Cass County (Logansport) ──
+    "46947","46950","46951",
+    # ── Howard County (Kokomo) ──
+    "46901","46902","46903","46904",
+    # ── Grant County (Marion) ──
+    "46952","46953","46960","46961","46962","46970","46971","46974",
+    "46975","46978","46979","46980","46982","46984","46986","46987",
+    "46988","46989","46990","46991","46992","46994","46995","46996",
+    "46998",
+    # ── Vigo County (Terre Haute) ──
+    "47801","47802","47803","47804","47805","47807","47809",
+    # ── Vanderburgh County (Evansville) ──
+    "47710","47711","47712","47713","47714","47715","47720","47721",
+    "47722","47724","47725","47728","47730","47731","47732","47733",
+    "47734","47735","47736","47737","47738","47739","47740","47741",
+    "47742","47743","47744","47747","47750",
+    # ── Clark County (Jeffersonville, Clarksville) ──
+    "47129","47130","47131","47132","47133","47134","47135","47136",
+    "47140","47141","47142","47143","47144","47145","47146","47147",
+    # ── Floyd County (New Albany) ──
+    "47150","47151","47152","47160","47161","47162","47163","47164",
+    "47165","47166","47167","47168","47170","47172","47174","47175",
+    # ── Dearborn County (Lawrenceburg) ──
+    "47001","47006","47010","47011","47012","47016","47017","47018",
+    "47019","47020","47021","47022","47023","47024","47025",
+    # ── Wayne County (Richmond) ──
+    "47374","47375","47376",
+    # ── Delaware County (Muncie) ──
+    "47302","47303","47304","47305","47306","47307","47308",
+    # ── Blackford / Jay County ──
+    "47348","47356","47360","47361","47362","47366","47367","47368",
+    "47369","47370","47371","47373","47380","47381","47382","47383",
+    "47384","47385","47386","47387","47388","47390","47392","47393",
+    "47394","47396",
+    # ── Dubois County (Jasper) ──
+    "47542","47546","47547","47549","47550","47553","47556","47557",
+    "47558","47561","47562","47564","47567","47568","47573","47574",
+    "47575","47576","47577","47578","47579","47580","47581","47584",
+    "47585","47586","47588","47590","47591","47596","47597","47598",
+    "47601","47610","47611","47612","47613","47614","47615","47616",
+    "47617","47618","47619","47620","47629","47630","47631","47633",
+    "47634","47635","47637","47638","47639","47640","47647","47648",
+    "47649","47654","47660","47665","47666","47670","47683","47701",
+    "47702","47703","47704","47705","47706","47708",
+    # ── Additional southern Indiana ──
+    "47102","47104","47106","47107","47108","47110","47111","47112",
+    "47114","47115","47116","47117","47118","47119","47120","47122",
+    "47123","47124","47125","47126","47137","47138","47139",
+    # ── Additional central/northern Indiana ──
+    "46101","46102","46103","46104","46105","46106","46107","46108",
+    "46109","46110","46111","46113","46114","46115","46116","46117",
+    "46118","46119","46120","46121","46122","46123","46124","46125",
+    "46126","46127","46128","46129","46130","46131","46132","46133",
+    "46135","46136","46138","46139","46140","46141","46142","46143",
+    "46144","46145","46146","46147","46148","46149","46150","46151",
+    "46152","46153","46154","46155","46156","46157","46158","46159",
+    "46160","46161","46162","46163","46164","46165","46166","46167",
+    "46168","46169","46170","46171","46172","46173","46174","46175",
+    "46176","46177","46178","46179","46180","46181","46182","46183",
+    "46184","46186","46187","46188",
+    "46401","46402","46403","46404","46405","46406","46407","46408",
+    "46409","46410","46411",
+    "46501","46502","46504","46506","46507","46508","46510","46511",
+    "46513","46514","46515","46516","46517","46524","46526","46527",
+    "46528","46530","46531","46532","46534","46536","46537","46538",
+    "46539","46540","46542","46543","46544","46545","46546","46550",
+    "46552","46553","46554","46555","46556","46557","46558","46559",
+    "46560","46561","46562","46563","46564","46565","46567","46570",
+    "46571","46572","46573","46574","46580","46581","46582","46590",
+    "46595",
+    "46700","46701","46702","46703","46704","46705","46706","46710",
+    "46711","46713","46714","46721","46723","46725","46730","46731",
+    "46732","46733","46737","46738","46740","46741","46742","46743",
+    "46745","46746","46747","46748","46750","46755","46759","46760",
+    "46761","46763","46764","46765","46766","46767","46769","46770",
+    "46771","46772","46773","46774","46775","46776","46777","46778",
+    "46779","46780","46781","46782","46783","46784","46785","46786",
+    "46787","46788","46789","46791","46792","46793","46794","46795",
+    "46796","46797","46798","46799",
+    "46900","46901","46902","46903","46904","46910","46911","46912",
+    "46913","46914","46915","46916","46917","46919","46920","46921",
+    "46922","46923","46924","46925","46926","46928","46929","46930",
+    "46931","46932","46933","46935","46936","46937","46938","46939",
+    "46940","46941","46942","46943","46945","46946","46947","46950",
+    "46951","46952","46953","46954","46957","46958","46959","46960",
+    "46961","46962","46963","46964","46965","46967","46968","46970",
+    "46971","46974","46975","46978","46979","46980","46982","46984",
+    "46985","46986","46987","46988","46989","46990","46991","46992",
+    "46994","46995","46996","46998",
+    "47001","47003","47006","47010","47011","47012","47016","47017",
+    "47018","47019","47020","47021","47022","47023","47024","47025",
+    "47030","47031","47032","47033","47034","47035","47036","47037",
+    "47038","47039","47040","47041","47042","47043","47060",
+    "47102","47104","47106","47107","47108","47110","47111","47112",
+    "47114","47115","47116","47117","47118","47119","47120","47122",
+    "47123","47124","47125","47126","47129","47130","47131","47132",
+    "47135","47136","47137","47138","47140","47141","47142","47143",
+    "47144","47145","47146","47147","47150","47151","47160","47161",
+    "47162","47163","47164","47165","47166","47167","47170","47172",
+    "47174","47175",
+    "47201","47202","47203","47220","47224","47225","47226","47227",
+    "47228","47229","47230","47231","47232","47234","47235","47236",
+    "47240","47243","47244","47245","47246","47247","47250","47260",
+    "47261","47262","47263","47264","47265","47270","47272","47273",
+    "47274","47280","47281","47282","47283",
+    "47302","47303","47304","47305","47306","47307","47308",
+    "47320","47322","47324","47325","47326","47327","47330","47331",
+    "47334","47335","47336","47337","47338","47339","47340","47341",
+    "47342","47344","47345","47346","47348","47351","47352","47353",
+    "47354","47355","47356","47357","47358","47359","47360","47361",
+    "47362","47366","47367","47368","47369","47370","47371","47373",
+    "47374","47375","47376","47380","47381","47382","47383","47384",
+    "47385","47386","47387","47388","47390","47392","47393","47394",
+    "47396",
+    "47401","47402","47403","47404","47405","47406","47407","47408",
+    "47420","47421","47424","47426","47427","47428","47429","47430",
+    "47431","47432","47433","47434","47435","47436","47437","47438",
+    "47439","47440","47441","47443","47445","47446","47448","47449",
+    "47451","47452","47453","47454","47455","47456","47457","47458",
+    "47459","47460","47462","47463","47464","47465","47467","47468",
+    "47469","47470","47471","47490",
+    "47501","47512","47513","47514","47515","47516","47519","47520",
+    "47521","47522","47523","47524","47525","47527","47528","47529",
+    "47531","47532","47535","47536","47537","47541","47542","47546",
+    "47547","47549","47550","47551","47552","47553","47556","47557",
+    "47558","47561","47562","47564","47567","47568","47573","47574",
+    "47575","47576","47577","47578","47579","47580","47581","47584",
+    "47585","47586","47588","47590","47591","47596","47597","47598",
+    "47601","47610","47611","47612","47613","47614","47615","47616",
+    "47617","47618","47619","47620","47629","47630","47631","47633",
+    "47634","47635","47637","47638","47639","47640","47647","47648",
+    "47649","47654","47660","47665","47666","47670","47683",
+    "47701","47702","47703","47704","47705","47706","47708",
+    "47710","47711","47712","47713","47714","47715","47720","47721",
+    "47722","47724","47725","47728",
+    "47801","47802","47803","47804","47805","47807","47809",
+    "47831","47832","47833","47834","47836","47837","47838","47840",
+    "47841","47842","47845","47846","47847","47848","47849","47850",
+    "47853","47854","47855","47857","47858","47859","47860","47861",
+    "47862","47863","47865","47866","47868","47869","47870","47871",
+    "47872","47874","47875","47876","47878","47879","47880","47881",
+    "47882","47884","47885",
+    "47901","47902","47903","47904","47905","47906","47907","47909",
+    "47916","47917","47918","47920","47921","47922","47923","47924",
+    "47925","47926","47928","47929","47930","47932","47933","47940",
+    "47941","47942","47943","47944","47946","47948","47949","47950",
+    "47951","47952","47954","47955","47957","47958","47959","47960",
+    "47962","47963","47964","47965","47966","47967","47968","47969",
+    "47970","47971","47974","47975","47977","47978","47980","47981",
+    "47982","47983","47984","47986","47987","47988","47989","47990",
+    "47991","47992","47993","47994","47995",
 }
 
 # ─────────────────────────────────────────
 #  SCREENING LOCATIONS BY ZIP PROXIMITY
 # ─────────────────────────────────────────
-# Each location: (name, address, phone, distance_label, url)
 screening_locations = [
     {
         "name": "IU Health North Hospital – Lung Screening",
@@ -537,37 +753,188 @@ screening_locations = [
         "name": "Hendricks Regional Health",
         "address": "1000 E Main St, Danville, IN 46122",
         "phone": "(317) 745-4451",
-        "note": "Serves 46112 area; radiology & screening programs",
+        "note": "Serves Hendricks County area; radiology & screening programs",
         "url": "https://hendricks.org",
+    },
+    {
+        "name": "Franciscan Health Mooresville",
+        "address": "1201 Hadley Rd, Mooresville, IN 46158",
+        "phone": "(317) 831-1160",
+        "note": "Serves Morgan County; cancer screening available",
+        "url": "https://franciscanhealth.org",
+    },
+    {
+        "name": "IU Health Morgan Hospital",
+        "address": "2209 John R Wooden Dr, Martinsville, IN 46151",
+        "phone": "(765) 342-8441",
+        "note": "Morgan County lung screening services",
+        "url": "https://iuhealth.org",
+    },
+    {
+        "name": "Putnam County Hospital",
+        "address": "1542 Bloomington St, Greencastle, IN 46135",
+        "phone": "(765) 653-5121",
+        "note": "Serves Greencastle/DePauw area; imaging & screening",
+        "url": "https://pchosp.org",
+    },
+    {
+        "name": "Franciscan Health Crawfordsville",
+        "address": "1710 Lafayette Rd, Crawfordsville, IN 47933",
+        "phone": "(765) 362-2800",
+        "note": "Serves west-central Indiana; cancer screening programs",
+        "url": "https://franciscanhealth.org",
+    },
+    {
+        "name": "IU Health Bloomington – Lung Screening",
+        "address": "601 W 2nd St, Bloomington, IN 47403",
+        "phone": "(812) 353-5555",
+        "note": "Monroe County; comprehensive cancer & lung program",
+        "url": "https://iuhealth.org",
+    },
+    {
+        "name": "IU Health Fort Wayne",
+        "address": "700 Broadway, Fort Wayne, IN 46802",
+        "phone": "(260) 450-5000",
+        "note": "Allen County lung cancer screening & pulmonology",
+        "url": "https://iuhealth.org",
+    },
+    {
+        "name": "Parkview Cancer Institute – Fort Wayne",
+        "address": "11050 Parkview Circle, Fort Wayne, IN 46845",
+        "phone": "(260) 266-4000",
+        "note": "Dedicated cancer center; LDCT screening available",
+        "url": "https://parkview.com",
+    },
+    {
+        "name": "Memorial Hospital – South Bend",
+        "address": "615 N Michigan St, South Bend, IN 46601",
+        "phone": "(574) 647-1000",
+        "note": "St. Joseph County; lung screening & oncology",
+        "url": "https://beaconhealthsystem.org",
+    },
+    {
+        "name": "Franciscan Health Lafayette",
+        "address": "1701 S Creasy Ln, Lafayette, IN 47905",
+        "phone": "(765) 502-4000",
+        "note": "Serves Tippecanoe County; cancer screening programs",
+        "url": "https://franciscanhealth.org",
+    },
+    {
+        "name": "Deaconess Cancer Institute – Evansville",
+        "address": "600 Mary St, Evansville, IN 47747",
+        "phone": "(812) 450-5000",
+        "note": "SW Indiana; comprehensive lung cancer program",
+        "url": "https://deaconess.com",
+    },
+    {
+        "name": "IU Health Ball Memorial – Muncie",
+        "address": "2401 University Ave, Muncie, IN 47303",
+        "phone": "(765) 747-3111",
+        "note": "Delaware County; lung screening & pulmonology",
+        "url": "https://iuhealth.org",
+    },
+    {
+        "name": "Reid Health – Richmond",
+        "address": "1401 Chester Blvd, Richmond, IN 47374",
+        "phone": "(765) 983-3000",
+        "note": "Wayne County; cancer screening & imaging services",
+        "url": "https://reidhealth.org",
     },
 ]
 
-# Map zip codes to the 2 closest locations (by index into screening_locations)
-zip_to_locations = {
-    # Carmel / NW Hamilton County
-    "46032": [0, 1],  # IU Health North, St. Vincent Carmel
-    "46033": [0, 1],
-    "46074": [0, 1],  # Zionsville
-    "46077": [0, 1],
-    # Fishers / Noblesville / NE Hamilton County
-    "46060": [5, 2],  # Aspire Noblesville, Community Health North
-    "46062": [5, 2],
-    "46038": [2, 0],
-    # Indianapolis north / Marion County
-    "46220": [2, 3],  # Community Health North, Methodist
-    "46240": [2, 0],
-    "46250": [2, 0],
-    "46256": [2, 0],
-    "46280": [0, 2],
-    "46290": [0, 2],
-    # Greenwood / south Marion
-    "46142": [4, 3],  # Franciscan, Methodist
-    # Brownsburg
-    "46112": [7, 4],  # Hendricks Regional, Franciscan
-}
+# Default fallback locations for unrecognized ZIPs
+DEFAULT_LOCATIONS = [3, 0]  # IU Methodist, IU Health North
 
 def get_nearby_locations(zip_code):
-    idxs = zip_to_locations.get(zip_code, [0, 2])
+    """Return 2 screening locations based on ZIP prefix geography."""
+    if not zip_code or len(zip_code) < 5:
+        return [screening_locations[i] for i in DEFAULT_LOCATIONS]
+
+    prefix3 = zip_code[:3]
+    prefix2 = zip_code[:2]
+
+    # Routing by 3-digit prefix
+    routing = {
+        # Indianapolis core
+        "462": [3, 2],   # IU Methodist + Community Health North
+        # Hamilton County (Carmel, Fishers, Noblesville, Westfield)
+        "460": [0, 1],   # IU North + St. Vincent Carmel
+        # Hendricks County
+        "461": [7, 4],   # Hendricks Regional + Franciscan
+        # Johnson County / south Marion
+        "461": [4, 3],   # Franciscan + IU Methodist
+        # Putnam County (Greencastle / DePauw)
+        "461": [10, 11], # Putnam County Hospital + Franciscan Crawfordsville
+        # Bloomington / Monroe County
+        "474": [12, 3],  # IU Bloomington + IU Methodist
+        # Fort Wayne / Allen County
+        "468": [13, 14], # IU Fort Wayne + Parkview
+        # South Bend / St. Joseph County
+        "466": [15, 3],  # Memorial SB + IU Methodist
+        # Lafayette / Tippecanoe
+        "479": [16, 3],  # Franciscan Lafayette + IU Methodist
+        # Evansville / Vanderburgh
+        "477": [17, 3],  # Deaconess + IU Methodist
+        # Muncie / Delaware
+        "473": [18, 3],  # Ball Memorial + IU Methodist
+        # Richmond / Wayne County
+        "473": [19, 18], # Reid Health + Ball Memorial
+    }
+
+    # Fine-grained overrides for specific ZIP codes
+    fine = {
+        # Carmel / NW Hamilton
+        "46032": [0, 1], "46033": [0, 1], "46074": [0, 1], "46077": [0, 1],
+        # Fishers / Noblesville / NE Hamilton
+        "46060": [5, 2], "46062": [5, 2], "46038": [2, 0],
+        # Indianapolis north / Broad Ripple
+        "46220": [2, 3], "46240": [2, 0], "46250": [2, 0],
+        "46256": [2, 0], "46280": [0, 2], "46290": [0, 2],
+        # Indianapolis core
+        "46201": [3, 2], "46202": [3, 2], "46204": [3, 2],
+        "46205": [3, 2], "46208": [3, 2],
+        # Indianapolis south
+        "46217": [4, 3], "46227": [4, 3], "46237": [4, 3],
+        # Greenwood / Johnson County
+        "46142": [4, 3], "46143": [4, 3], "46131": [4, 3],
+        # Brownsburg / Hendricks
+        "46112": [7, 4], "46122": [7, 4], "46123": [7, 4],
+        # Mooresville / Morgan County
+        "46158": [8, 9], "46151": [9, 8],
+        # Greencastle / DePauw area / Putnam County
+        "46135": [10, 11], "46170": [10, 11], "46172": [10, 11],
+        "46105": [10, 11], "46120": [10, 11],
+        # Crawfordsville / Montgomery County
+        "47933": [11, 16],
+        # Bloomington / Monroe County
+        "47401": [12, 3], "47403": [12, 3], "47404": [12, 3],
+        "47405": [12, 3], "47408": [12, 3],
+        # Fort Wayne
+        "46802": [13, 14], "46804": [13, 14], "46805": [13, 14],
+        "46814": [13, 14], "46845": [14, 13],
+        # South Bend
+        "46601": [15, 3], "46614": [15, 3], "46628": [15, 3],
+        # Lafayette / Purdue
+        "47901": [16, 3], "47904": [16, 3], "47906": [16, 3],
+        # Evansville
+        "47710": [17, 3], "47711": [17, 3], "47712": [17, 3],
+        # Muncie
+        "47303": [18, 3], "47304": [18, 3], "47306": [18, 3],
+        # Richmond
+        "47374": [19, 18],
+        # Kokomo / Howard County
+        "46901": [6, 2], "46902": [6, 2],
+        # Anderson / Madison County
+        "46011": [2, 3], "46012": [2, 3], "46013": [2, 3],
+    }
+
+    if zip_code in fine:
+        idxs = fine[zip_code]
+    elif prefix3 in routing:
+        idxs = routing[prefix3]
+    else:
+        idxs = DEFAULT_LOCATIONS
+
     return [screening_locations[i] for i in idxs]
 
 # ─────────────────────────────────────────
@@ -577,51 +944,57 @@ log_file = "usage_log.csv"
 def log_usage(data):
     exists = os.path.isfile(log_file)
     with open(log_file,"a",newline="") as f:
-        fields = ["timestamp","user_id","zip","lat","lon","age","smoking_status","risk_group","risk_pct"]
+        fields = ["timestamp","user_id","zip","age","smoking_status","risk_group","risk_pct"]
         w = csv.DictWriter(f, fieldnames=fields)
         if not exists:
             w.writeheader()
         w.writerow(data)
 
 # ─────────────────────────────────────────
-#  RISK MODEL
+#  RISK MODEL  (PLCOm2012 — Tammemägi et al., NEJM 2013)
 # ─────────────────────────────────────────
 def logistic(x):
-    return 1/(1+np.exp(-np.clip(x,-500,500)))
+    return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
 
 def plco_m2012(age, race, education, bmi, copd, cancer_hist, family_hist,
                smoking_status, smoking_intensity, duration_smoking, smoking_quit_time):
-    """PLCOm2012 model (validated on ages 40-90). Returns 6-year absolute risk (0-1)."""
-    m = (0.0778868*(age-62)
-       - 0.0812744*(education-4)
-       - 0.0274194*(bmi-27)
-       + 0.3553063*copd
-       + 0.4589971*cancer_hist
-       + 0.587185*family_hist
-       + 0.2597431*smoking_status
-       + 0.0317321*(duration_smoking-27)
-       - 0.0308572*(smoking_quit_time-10)
-       - 4.532506)
-    if smoking_status==1 and smoking_intensity>0:
-        m += -1.822606*((smoking_intensity/10)**(-1) - 0.4021541613)
+    """
+    PLCOm2012 model (Tammemägi et al., NEJM 2013).
+    Returns 6-year absolute risk of lung cancer (0–1).
+    Validated for ever-smokers aged 40–80.
+    Coefficients sourced from the original publication.
+    """
+    m = (
+          0.0778868  * (age - 62)
+        - 0.0812744  * (education - 4)
+        - 0.0274194  * (bmi - 27)
+        + 0.3553063  * copd
+        + 0.4589971  * cancer_hist
+        + 0.587185   * family_hist
+        + 0.2597431  * smoking_status
+        + 0.0317321  * (duration_smoking - 27)
+        - 0.0308572  * (smoking_quit_time - 10)
+        - 4.532506
+    )
+    # Smoking intensity term (inverse power): only applies to smokers
+    if smoking_status == 1 and smoking_intensity > 0:
+        m += -1.822606 * ((smoking_intensity / 10) ** (-1) - 0.4021541613)
     return logistic(m)
 
 def extrapolate_risk(age, race, education, bmi, copd, cancer_hist, family_hist,
                      smoking_status, smoking_intensity, duration_smoking, smoking_quit_time):
     """
     For ages < 40: extrapolate from the model's age=40 baseline using an
-    exponential age-scaling factor.  Risk is dramatically lower for younger ages.
-    For ages > 90: cap at age=90 result.
+    exponential age-scaling factor. Risk is dramatically lower for younger ages.
+    For ages > 80: cap at age=80 result (model validated up to 80).
     """
-    actual_age = age
     if age < 40:
         base_risk = plco_m2012(40, race, education, bmi, copd, cancer_hist, family_hist,
                                smoking_status, smoking_intensity, duration_smoking, smoking_quit_time)
-        # Exponential decay: lung cancer incidence roughly doubles every ~10 yrs below 50
         scale = math.exp(-0.065 * (40 - age))
         return base_risk * scale
-    elif age > 90:
-        return plco_m2012(90, race, education, bmi, copd, cancer_hist, family_hist,
+    elif age > 80:
+        return plco_m2012(80, race, education, bmi, copd, cancer_hist, family_hist,
                           smoking_status, smoking_intensity, duration_smoking, smoking_quit_time)
     else:
         return plco_m2012(age, race, education, bmi, copd, cancer_hist, family_hist,
@@ -629,11 +1002,9 @@ def extrapolate_risk(age, race, education, bmi, copd, cancer_hist, family_hist,
 
 def lung_age_from_risk(actual_age, risk_pct):
     """
-    Compute 'lung age' by finding what age a non-smoking average person
-    would need to be to have the same risk.
-    Blended: partly actuarial offset, partly risk-ratio scaling.
+    Compute 'lung age' by estimating what age a baseline person
+    would need to be to carry the same 6-year risk.
     """
-    base = actual_age
     if risk_pct <= 0.1:
         offset = -8
     elif risk_pct <= 0.5:
@@ -646,11 +1017,10 @@ def lung_age_from_risk(actual_age, risk_pct):
         offset = int(10 + (risk_pct - 3.0) * 4)
     else:
         offset = int(22 + (risk_pct - 6.0) * 2)
-    return max(10, min(100, base + offset))
+    return max(10, min(100, actual_age + offset))
 
 def risk_category(risk_pct, age):
-    """Returns (category_str, threshold_used)"""
-    # USPSTF: ≥1.3% = eligible for screening (for 50–80 yo, pack-year criteria separate)
+    """Returns (category_str, threshold_used). Thresholds per clinical literature."""
     if risk_pct >= 3.0:
         return "high", 3.0
     elif risk_pct >= 1.3:
@@ -659,7 +1029,7 @@ def risk_category(risk_pct, age):
         return "low", 1.3
 
 def uspstf_qualifies(age, smoking_status, pack_years):
-    """USPSTF 2021 criteria: age 50-80, current or former smoker, ≥20 pack-years."""
+    """USPSTF 2021 criteria: age 50–80, current or former smoker, ≥20 pack-years."""
     if smoking_status == "Never":
         return False, "Non-smokers do not qualify for USPSTF lung screening guidelines."
     if age < 50 or age > 80:
@@ -737,33 +1107,41 @@ st.markdown("""
 # ── Location ──
 st.markdown('<div class="section-label">📍 Location</div>', unsafe_allow_html=True)
 
-zip_state = ""
-if "zip_input" in st.session_state and st.session_state["zip_input"]:
-    z = st.session_state["zip_input"]
-    if z in valid_zips:
-        zip_state = "zip-valid"
-    elif len(z) >= 3:
-        zip_state = "zip-invalid"
+zip_input_val = st.session_state.get("zip_input", "")
+is_five_digits = len(zip_input_val) == 5 and zip_input_val.isdigit()
+is_in_indiana = zip_input_val in valid_zips
 
-st.markdown(f'<div class="{zip_state}">', unsafe_allow_html=True)
+# Green outline whenever the user has typed a valid 5-digit ZIP
+zip_css_class = "zip-valid" if is_five_digits else ""
+
+st.markdown(f'<div class="{zip_css_class}">', unsafe_allow_html=True)
 zip_code = st.text_input(
-    "ZIP Code (Indianapolis / Carmel area)",
+    "ZIP Code",
     placeholder="e.g. 46032",
-    key="zip_input"
+    key="zip_input",
+    max_chars=5,
 )
 st.markdown('</div>', unsafe_allow_html=True)
 
 if zip_code:
-    if zip_code in valid_zips:
+    if is_in_indiana:
         st.markdown('<div class="zip-status ok">✓ ZIP code recognized — screening locations loaded</div>', unsafe_allow_html=True)
-    elif len(zip_code) >= 3:
-        st.markdown('<div class="zip-status err">✗ ZIP not in service area — enter an Indianapolis/Carmel ZIP (e.g. 46032)</div>', unsafe_allow_html=True)
+    elif is_five_digits:
+        st.markdown('<div class="zip-status warn">ZIP entered — note: screening locations shown for nearest Indiana facility</div>', unsafe_allow_html=True)
 
 # ── Demographics ──
 st.markdown('<div class="section-label">👤 About You</div>', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    age = st.number_input("Age", min_value=10, max_value=100, value=55)
+    # Type-only age input (spinner buttons hidden via CSS)
+    age = st.number_input(
+        "Age",
+        min_value=10,
+        max_value=100,
+        value=55,
+        step=1,
+        format="%d",
+    )
 with col2:
     race = st.selectbox("Race / Ethnicity", ["White","Black","Hispanic","Asian","Other"])
 
@@ -852,10 +1230,6 @@ with col2:
 #  RESULTS
 # ─────────────────────────────────────────
 if run:
-    if zip_code and zip_code not in valid_zips:
-        st.error("Please enter a valid ZIP code before continuing.")
-        st.stop()
-
     risk = extrapolate_risk(
         age, race, education_val, bmi, copd, cancer_hist, family_hist,
         smoking_status_val, cigs, years, quit
@@ -866,7 +1240,6 @@ if run:
     age_diff = lung_age_val - age
     qualifies, qual_msg = uspstf_qualifies(age, smoking, pack_years)
 
-    # Store everything needed for display in session state
     st.session_state.results = {
         "risk_pct": risk_pct, "category": category, "threshold": threshold,
         "lung_age_val": lung_age_val, "age_diff": age_diff,
@@ -877,12 +1250,10 @@ if run:
         "family_hist": family_hist, "cigs": cigs, "years": years,
     }
 
-    lat, lon = zip_to_latlon.get(zip_code, (None, None)) if zip_code else (None, None)
     log_usage({
         "timestamp": datetime.datetime.now().isoformat(),
         "user_id": st.session_state.user_id,
         "zip": zip_code or "",
-        "lat": lat, "lon": lon,
         "age": age,
         "smoking_status": smoking,
         "risk_group": category,
@@ -940,12 +1311,12 @@ if "results" in st.session_state:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Nearby Screening Locations ──
-    nearby = get_nearby_locations(zip_code) if zip_code in valid_zips else []
+    # ── Nearby Locations ──
+    nearby = get_nearby_locations(zip_code) if zip_code and len(zip_code) == 5 else []
     if nearby:
         st.markdown('<div class="section-label">📍 Screening Centers Near You</div>', unsafe_allow_html=True)
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Based on your ZIP code, these facilities offer lung cancer screening</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">Facilities near your ZIP code that offer lung cancer screening</div>', unsafe_allow_html=True)
         st.markdown('<div class="loc-grid">', unsafe_allow_html=True)
         for loc in nearby:
             st.markdown(f"""
