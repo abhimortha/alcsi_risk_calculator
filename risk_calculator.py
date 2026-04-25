@@ -781,7 +781,7 @@ if zip_code:
     elif is_five_digits and detected_state:
         st.markdown(f'<div class="zip-status ok">✓ {detected_state} ZIP recognized — screening center for your state loaded</div>', unsafe_allow_html=True)
     elif is_five_digits:
-        st.markdown('<div class="zip-status warn">ZIP entered — we\'ll show a nearby cancer center</div>', unsafe_allow_html=True)
+        st.markdown('<div class="zip-status warn">⚠ ZIP code not recognized — please double-check and re-enter</div>', unsafe_allow_html=True)
 
 # ── Urban/Rural ──
 st.markdown(info_tip("Where do you live?",
@@ -881,6 +881,14 @@ st.markdown("<br>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     run = st.button("🔬  Calculate My Lung Risk")
+
+# Validate required fields before processing
+if run and not zip_code:
+    st.error("⚠️ Please enter your ZIP code before submitting.")
+    run = False
+elif run and not is_five_digits:
+    st.error("⚠️ Please enter a valid 5-digit ZIP code.")
+    run = False
 
 # ─────────────────────────────────────────
 #  RESULTS
