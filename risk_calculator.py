@@ -287,13 +287,14 @@ if "started" not in st.session_state:
 
 import hashlib
 
-# Fetch public IP
+# Fetch real client IP from browser
 if "user_ip" not in st.session_state:
-    try:
-        ip_resp = requests.get("https://api.ipify.org?format=json", timeout=3)
-        st.session_state.user_ip = ip_resp.json().get("ip", "unknown")
-    except Exception:
-        st.session_state.user_ip = "unknown"
+    ip_from_browser = streamlit_js_eval(js_expressions="""
+        fetch('https://api.ipify.org?format=json')
+            .then(r => r.json())
+            .then(data => data.ip)
+    """, key="get_ip")
+    st.session_state.user_ip = ip_from_browser if ip_from_browser else "unknown"
 
 # Build a server-side device fingerprint from request headers
 if "device_id" not in st.session_state:
