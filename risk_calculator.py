@@ -7,7 +7,7 @@ import math
 import requests
 from streamlit_js_eval import streamlit_js_eval
 
-SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"
+SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbxdIwpKDW6GH-R9aEUm2LIgn8ictipR8F1fTK4ZMsksn_Qk3I6pKMl4vhQ3COFNTdvR/exec"
 
 # ─────────────────────────────────────────
 #  PAGE CONFIG
