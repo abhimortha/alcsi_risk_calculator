@@ -7,7 +7,7 @@ import math
 import requests
 from streamlit_js_eval import streamlit_js_eval
 
-SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycby3GpPK0_0vxEbrFsCeqnVYsh001xb9t5m6yl0GUabHkp-tLDgrp_4BLVLrArECfVSP/exec"
+SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"
 
 # ─────────────────────────────────────────
 #  PAGE CONFIG
@@ -284,6 +284,7 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 # ─────────────────────────────────────────
 if "started" not in st.session_state:
     st.session_state.started = False
+
 # Fetch public IP
 if "user_ip" not in st.session_state:
     try:
@@ -292,20 +293,42 @@ if "user_ip" not in st.session_state:
     except Exception:
         st.session_state.user_ip = "unknown"
 
-# Generate or retrieve a persistent device ID stored in the browser via cookie
+# Generate or retrieve a persistent device ID using localStorage + browser fingerprinting
 if "device_id" not in st.session_state:
     device_id_js = streamlit_js_eval(js_expressions="""
         (function() {
-            let id = document.cookie.split('; ').find(r => r.startsWith('lungiq_device_id='));
-            if (id) {
-                return id.split('=')[1];
-            } else {
-                let newId = 'dev_' + Math.random().toString(36).substr(2, 12) + Date.now().toString(36);
-                let expires = new Date();
-                expires.setFullYear(expires.getFullYear() + 2);
-                document.cookie = 'lungiq_device_id=' + newId + '; expires=' + expires.toUTCString() + '; path=/; SameSite=Lax';
-                return newId;
+            // Try localStorage first (persists across sessions on same device)
+            try {
+                let stored = localStorage.getItem('lungiq_device_id');
+                if (stored) return stored;
+            } catch(e) {}
+
+            // Build a fingerprint from stable browser properties
+            const fp_parts = [
+                navigator.userAgent,
+                navigator.language,
+                screen.width + 'x' + screen.height,
+                screen.colorDepth,
+                new Date().getTimezoneOffset(),
+                navigator.hardwareConcurrency || '',
+                navigator.platform || ''
+            ];
+            const fp_str = fp_parts.join('|');
+
+            // Simple hash function
+            let hash = 0;
+            for (let i = 0; i < fp_str.length; i++) {
+                hash = ((hash << 5) - hash) + fp_str.charCodeAt(i);
+                hash |= 0;
             }
+            const newId = 'fp_' + Math.abs(hash).toString(36) + '_' + Date.now().toString(36);
+
+            // Save to localStorage for future visits
+            try {
+                localStorage.setItem('lungiq_device_id', newId);
+            } catch(e) {}
+
+            return newId;
         })()
     """, key="get_device_id")
     st.session_state.device_id = device_id_js if device_id_js else "unknown"
@@ -380,7 +403,6 @@ indiana_zips = {
 
 # ─────────────────────────────────────────
 #  STATE → Major Lung Cancer Screening Centers fallback
-#  Used when ZIP is outside Indiana AND Google Places unavailable
 # ─────────────────────────────────────────
 STATE_SCREENING_FALLBACK = {
     "AL": [{"name": "UAB Comprehensive Cancer Center", "address": "1802 6th Ave S, Birmingham, AL 35233", "phone": "(205) 934-5077"}],
@@ -437,7 +459,6 @@ STATE_SCREENING_FALLBACK = {
     "PR": [{"name": "UPR Comprehensive Cancer Center", "address": "PMB 711, 89 De Diego Ave Suite 105, San Juan, PR 00927", "phone": "(787) 772-8300"}],
 }
 
-# ZIP prefix → state code (first 3 digits cover most states)
 ZIP_PREFIX_TO_STATE = {
     "005": "PR","006": "PR","007": "PR","008": "PR","009": "PR",
     "010": "MA","011": "MA","012": "MA","013": "MA","014": "MA","015": "MA","016": "MA","017": "MA","018": "MA","019": "MA",
@@ -547,7 +568,6 @@ ZIP_PREFIX_TO_STATE = {
 }
 
 def get_state_from_zip(zip_code):
-    """Return 2-letter state abbreviation from ZIP code."""
     if not zip_code or len(zip_code) < 3:
         return None
     return ZIP_PREFIX_TO_STATE.get(zip_code[:3], None)
@@ -620,12 +640,9 @@ def get_indiana_locations(zip_code):
     return [screening_locations[i] for i in idxs]
 
 def get_nearby_locations(zip_code):
-    """Return screening locations. Indiana: curated. Other states: state-level fallback."""
     if not zip_code or len(zip_code) != 5 or not zip_code.isdigit():
         return [], None, None
-
     state = get_state_from_zip(zip_code)
-
     if zip_code in indiana_zips or state == "IN":
         locs = get_indiana_locations(zip_code)
         return [{"name": l["name"], "address": l["address"], "phone": l["phone"],
@@ -899,7 +916,6 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     run = st.button("🔬  Calculate My Lung Risk")
 
-# Validate required fields before processing
 if run and not zip_code:
     st.error("⚠️ Please enter your ZIP code before submitting.")
     run = False
@@ -938,7 +954,7 @@ if run:
         "ip_address": st.session_state.user_ip,
         "zip": zip_code or "",
         "state": get_state_from_zip(zip_code) or "",
-        "area_type": area_type,                        # ← new field
+        "area_type": area_type,
         "age": age,
         "race": race,
         "education": education,
