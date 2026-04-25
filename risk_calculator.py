@@ -5,6 +5,7 @@ import datetime
 import os
 import csv
 import math
+import requests
 
 # ─────────────────────────────────────────
 #  PAGE CONFIG
@@ -940,15 +941,23 @@ def get_nearby_locations(zip_code):
 # ─────────────────────────────────────────
 #  LOGGING
 # ─────────────────────────────────────────
-log_file = "usage_log.csv"
+SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"  # paste your Apps Script URL
+
 def log_usage(data):
+    # Local CSV backup (still works)
     exists = os.path.isfile(log_file)
-    with open(log_file,"a",newline="") as f:
-        fields = ["timestamp","user_id","zip","age","smoking_status","risk_group","risk_pct"]
+    with open(log_file, "a", newline="") as f:
+        fields = list(data.keys())
         w = csv.DictWriter(f, fieldnames=fields)
         if not exists:
             w.writeheader()
         w.writerow(data)
+
+    # Send to Google Sheets
+    try:
+        requests.post(SHEETS_WEBHOOK, json=data, timeout=5)
+    except Exception:
+        pass  # Never crash the app if logging fails
 
 # ─────────────────────────────────────────
 #  RISK MODEL  (PLCOm2012 — Tammemägi et al., NEJM 2013)
@@ -1250,15 +1259,24 @@ if run:
         "family_hist": family_hist, "cigs": cigs, "years": years,
     }
 
-    log_usage({
-        "timestamp": datetime.datetime.now().isoformat(),
-        "user_id": st.session_state.user_id,
-        "zip": zip_code or "",
-        "age": age,
-        "smoking_status": smoking,
-        "risk_group": category,
-        "risk_pct": round(risk_pct, 3),
-    })
+log_usage({
+    "timestamp": datetime.datetime.now().isoformat(),
+    "user_id": st.session_state.user_id,
+    "zip": zip_code or "",
+    "age": age,
+    "race": race,
+    "education": education,
+    "bmi": round(bmi, 1),
+    "smoking_status": smoking,
+    "pack_years": round(pack_years, 1),
+    "copd": copd,
+    "cancer_hist": cancer_hist,
+    "family_hist": family_hist,
+    "risk_pct": round(risk_pct, 3),
+    "risk_group": category,
+    "lung_age": lung_age_val,
+    "uspstf_eligible": qualifies,
+})
 
 if "results" in st.session_state:
     r = st.session_state.results
