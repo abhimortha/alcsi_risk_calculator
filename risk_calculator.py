@@ -5,9 +5,10 @@ import os
 import csv
 import math
 import requests
+import hashlib
 from streamlit_js_eval import streamlit_js_eval
 
-SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbxdIwpKDW6GH-R9aEUm2LIgn8ictipR8F1fTK4ZMsksn_Qk3I6pKMl4vhQ3COFNTdvR/exec"
+SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbywtTErvM079-3bMSXw6MzADhJRZMiZydxbYy3PqE0_1pwQ_wKqLpU9QBiGKLPDZRor/exec"
 
 # ─────────────────────────────────────────
 #  PAGE CONFIG
@@ -274,6 +275,19 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 
 .age-warn { background: #FFF8E1; border-left: 4px solid #FFC107; border-radius: 0 10px 10px 0; padding: 14px 18px; font-size: 13.5px; color: #5D4037; margin-bottom: 12px; line-height: 1.55; }
 
+.loading-box {
+    background: #EBF2FF;
+    border: 1.5px solid #7EB3FF;
+    border-radius: 16px;
+    padding: 22px 24px;
+    text-align: center;
+    font-size: 15px;
+    color: #0D2952;
+    font-weight: 500;
+    margin: 20px 0;
+}
+.loading-box .spinner { font-size: 28px; display: block; margin-bottom: 10px; }
+
 [data-testid="stNumberInput"]:has(input[aria-label="Age"]) button { display: none !important; }
 [data-testid="stNumberInput"]:has(input[aria-label="Age"]) > div { gap: 0 !important; }
 </style>
@@ -284,17 +298,8 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 # ─────────────────────────────────────────
 if "started" not in st.session_state:
     st.session_state.started = False
-
-import hashlib
-
-# Fetch real client IP from browser
-if "user_ip" not in st.session_state:
-    ip_from_browser = streamlit_js_eval(js_expressions="""
-        fetch('https://api.ipify.org?format=json')
-            .then(r => r.json())
-            .then(data => data.ip)
-    """, key="get_ip")
-    st.session_state.user_ip = ip_from_browser if ip_from_browser else "unknown"
+if "calculating" not in st.session_state:
+    st.session_state.calculating = False
 
 # Build a server-side device fingerprint from request headers
 if "device_id" not in st.session_state:
@@ -303,15 +308,14 @@ if "device_id" not in st.session_state:
         user_agent = headers.get("User-Agent", "")
         accept_lang = headers.get("Accept-Language", "")
         accept_enc = headers.get("Accept-Encoding", "")
-        # Combine with IP so same browser on different networks = different ID
-        raw = f"{st.session_state.user_ip}|{user_agent}|{accept_lang}|{accept_enc}"
+        raw = f"{user_agent}|{accept_lang}|{accept_enc}"
         fingerprint = "fp_" + hashlib.md5(raw.encode()).hexdigest()[:16]
         st.session_state.device_id = fingerprint
     except Exception:
         st.session_state.device_id = "unknown"
 
 # ─────────────────────────────────────────
-#  ZIP DATA — Indiana ZIPs (kept for curated screening lookup)
+#  ZIP DATA — Indiana ZIPs
 # ─────────────────────────────────────────
 indiana_zips = {
     "46201","46202","46203","46204","46205","46206","46207","46208",
@@ -379,7 +383,7 @@ indiana_zips = {
 }
 
 # ─────────────────────────────────────────
-#  STATE → Major Lung Cancer Screening Centers fallback
+#  STATE SCREENING FALLBACK
 # ─────────────────────────────────────────
 STATE_SCREENING_FALLBACK = {
     "AL": [{"name": "UAB Comprehensive Cancer Center", "address": "1802 6th Ave S, Birmingham, AL 35233", "phone": "(205) 934-5077"}],
@@ -550,7 +554,7 @@ def get_state_from_zip(zip_code):
     return ZIP_PREFIX_TO_STATE.get(zip_code[:3], None)
 
 # ─────────────────────────────────────────
-#  INDIANA SCREENING LOCATIONS (curated)
+#  INDIANA SCREENING LOCATIONS
 # ─────────────────────────────────────────
 screening_locations = [
     {"name": "IU Health North Hospital – Lung Screening", "address": "11700 N Meridian St, Carmel, IN 46032", "phone": "(317) 688-2000", "note": "LDCT lung screening; referral or self-referral accepted", "url": "https://iuhealth.org"},
@@ -889,69 +893,89 @@ if smoking != "Never":
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Submit ──
-col1, col2, col3 = st.columns([1,2,1])
-with col2:
-    run = st.button("🔬  Calculate My Lung Risk")
+# Only show the form and button if results haven't been calculated yet
+if "results" not in st.session_state:
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        run = st.button("🔬  Calculate My Lung Risk")
 
-if run and not zip_code:
-    st.error("⚠️ Please enter your ZIP code before submitting.")
-    run = False
-elif run and not is_five_digits:
-    st.error("⚠️ Please enter a valid 5-digit ZIP code.")
-    run = False
+    if st.session_state.calculating:
+        st.markdown("""
+        <div class="loading-box">
+            <span class="spinner">⏳</span>
+            Calculating your lung risk — please wait and do not press the button again…
+        </div>
+        """, unsafe_allow_html=True)
+        run = False
+
+    if run and not zip_code:
+        st.error("⚠️ Please enter your ZIP code before submitting.")
+        run = False
+    elif run and not is_five_digits:
+        st.error("⚠️ Please enter a valid 5-digit ZIP code.")
+        run = False
+
+    if run:
+        st.session_state.calculating = True
+        st.markdown("""
+        <div class="loading-box">
+            <span class="spinner">⏳</span>
+            Calculating your lung risk — please wait and do not press the button again…
+        </div>
+        """, unsafe_allow_html=True)
+
+        risk = extrapolate_risk(
+            age, race, education_val, bmi, copd, cancer_hist, family_hist,
+            smoking_status_val, cigs, years, quit
+        )
+        risk_pct = risk * 100
+        category, threshold = risk_category(risk_pct, age)
+        lung_age_val = lung_age_from_risk(age, risk_pct)
+        age_diff = lung_age_val - age
+        qualifies, qual_msg = uspstf_qualifies(age, smoking, pack_years)
+
+        st.session_state.results = {
+            "risk_pct": risk_pct, "category": category, "threshold": threshold,
+            "lung_age_val": lung_age_val, "age_diff": age_diff,
+            "qualifies": qualifies, "qual_msg": qual_msg,
+            "age": age, "smoking": smoking, "pack_years": pack_years,
+            "zip_code": zip_code, "race": race, "education_val": education_val,
+            "bmi": bmi, "copd": copd, "cancer_hist": cancer_hist,
+            "family_hist": family_hist, "cigs": cigs, "years": years,
+            "area_type": area_type,
+        }
+
+        log_usage({
+            "timestamp": datetime.datetime.now().isoformat(),
+            "user_id": st.session_state.device_id,
+            "zip": zip_code or "",
+            "state": get_state_from_zip(zip_code) or "",
+            "area_type": area_type,
+            "age": age,
+            "race": race,
+            "education": education,
+            "bmi": round(bmi, 1),
+            "smoking_status": smoking,
+            "pack_years": round(pack_years, 1),
+            "copd": copd,
+            "cancer_hist": cancer_hist,
+            "family_hist": family_hist,
+            "risk_pct": round(risk_pct, 3),
+            "risk_group": category,
+            "lung_age": lung_age_val,
+            "uspstf_eligible": qualifies,
+        })
+
+        st.session_state.calculating = False
+        st.rerun()
 
 # ─────────────────────────────────────────
 #  RESULTS
 # ─────────────────────────────────────────
-if run:
-    risk = extrapolate_risk(
-        age, race, education_val, bmi, copd, cancer_hist, family_hist,
-        smoking_status_val, cigs, years, quit
-    )
-    risk_pct = risk * 100
-    category, threshold = risk_category(risk_pct, age)
-    lung_age_val = lung_age_from_risk(age, risk_pct)
-    age_diff = lung_age_val - age
-    qualifies, qual_msg = uspstf_qualifies(age, smoking, pack_years)
-
-    st.session_state.results = {
-        "risk_pct": risk_pct, "category": category, "threshold": threshold,
-        "lung_age_val": lung_age_val, "age_diff": age_diff,
-        "qualifies": qualifies, "qual_msg": qual_msg,
-        "age": age, "smoking": smoking, "pack_years": pack_years,
-        "zip_code": zip_code, "race": race, "education_val": education_val,
-        "bmi": bmi, "copd": copd, "cancer_hist": cancer_hist,
-        "family_hist": family_hist, "cigs": cigs, "years": years,
-        "area_type": area_type,
-    }
-
-    log_usage({
-        "timestamp": datetime.datetime.now().isoformat(),
-        "user_id": st.session_state.device_id,
-        "ip_address": st.session_state.user_ip,
-        "zip": zip_code or "",
-        "state": get_state_from_zip(zip_code) or "",
-        "area_type": area_type,
-        "age": age,
-        "race": race,
-        "education": education,
-        "bmi": round(bmi, 1),
-        "smoking_status": smoking,
-        "pack_years": round(pack_years, 1),
-        "copd": copd,
-        "cancer_hist": cancer_hist,
-        "family_hist": family_hist,
-        "risk_pct": round(risk_pct, 3),
-        "risk_group": category,
-        "lung_age": lung_age_val,
-        "uspstf_eligible": qualifies,
-    })
-
 if "results" in st.session_state:
     r = st.session_state.results
     risk_pct      = r["risk_pct"]
     category      = r["category"]
-    threshold     = r["threshold"]
     lung_age_val  = r["lung_age_val"]
     age_diff      = r["age_diff"]
     qualifies     = r["qualifies"]
@@ -984,14 +1008,13 @@ if "results" in st.session_state:
         f"{abs(age_diff)} years younger than your actual age" if age_diff < 0 else
         "matching your actual age — you're on track"
     )
-    panel_class = category
 
     st.markdown(f"""
-    <div class="result-panel {panel_class}">
+    <div class="result-panel {category}">
         <div class="lung-age-label">Your LungIQ Lung Age</div>
-        <div class="lung-age-value {panel_class}">{lung_age_val}</div>
+        <div class="lung-age-value {category}">{lung_age_val}</div>
         <div class="lung-age-diff">{diff_text}</div>
-        <div class="risk-badge {panel_class}">
+        <div class="risk-badge {category}">
             {"⚠️ High Risk" if category=="high" else ("⚡ Moderate Risk" if category=="moderate" else "✅ Lower Risk")}
         </div>
     </div>
@@ -1056,14 +1079,6 @@ if "results" in st.session_state:
         {qual_msg}
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        if st.button("🔄  Start Over"):
-            st.session_state.started = False
-            del st.session_state.results
-            st.rerun()
 
 # ── Footer ──
 st.markdown("""
