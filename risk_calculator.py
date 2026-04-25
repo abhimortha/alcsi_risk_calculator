@@ -285,6 +285,8 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 if "started" not in st.session_state:
     st.session_state.started = False
 
+import hashlib
+
 # Fetch public IP
 if "user_ip" not in st.session_state:
     try:
@@ -293,45 +295,19 @@ if "user_ip" not in st.session_state:
     except Exception:
         st.session_state.user_ip = "unknown"
 
-# Generate or retrieve a persistent device ID using localStorage + browser fingerprinting
+# Build a server-side device fingerprint from request headers
 if "device_id" not in st.session_state:
-    device_id_js = streamlit_js_eval(js_expressions="""
-        (function() {
-            // Try localStorage first (persists across sessions on same device)
-            try {
-                let stored = localStorage.getItem('lungiq_device_id');
-                if (stored) return stored;
-            } catch(e) {}
-
-            // Build a fingerprint from stable browser properties
-            const fp_parts = [
-                navigator.userAgent,
-                navigator.language,
-                screen.width + 'x' + screen.height,
-                screen.colorDepth,
-                new Date().getTimezoneOffset(),
-                navigator.hardwareConcurrency || '',
-                navigator.platform || ''
-            ];
-            const fp_str = fp_parts.join('|');
-
-            // Simple hash function
-            let hash = 0;
-            for (let i = 0; i < fp_str.length; i++) {
-                hash = ((hash << 5) - hash) + fp_str.charCodeAt(i);
-                hash |= 0;
-            }
-            const newId = 'fp_' + Math.abs(hash).toString(36) + '_' + Date.now().toString(36);
-
-            // Save to localStorage for future visits
-            try {
-                localStorage.setItem('lungiq_device_id', newId);
-            } catch(e) {}
-
-            return newId;
-        })()
-    """, key="get_device_id")
-    st.session_state.device_id = device_id_js if device_id_js else "unknown"
+    try:
+        headers = st.context.headers
+        user_agent = headers.get("User-Agent", "")
+        accept_lang = headers.get("Accept-Language", "")
+        accept_enc = headers.get("Accept-Encoding", "")
+        # Combine with IP so same browser on different networks = different ID
+        raw = f"{st.session_state.user_ip}|{user_agent}|{accept_lang}|{accept_enc}"
+        fingerprint = "fp_" + hashlib.md5(raw.encode()).hexdigest()[:16]
+        st.session_state.device_id = fingerprint
+    except Exception:
+        st.session_state.device_id = "unknown"
 
 # ─────────────────────────────────────────
 #  ZIP DATA — Indiana ZIPs (kept for curated screening lookup)
