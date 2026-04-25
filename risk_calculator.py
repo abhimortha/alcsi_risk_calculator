@@ -5,6 +5,7 @@ import os
 import csv
 import math
 import requests
+from streamlit_js_eval import streamlit_js_eval
 
 SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"
 
@@ -283,12 +284,31 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 # ─────────────────────────────────────────
 if "started" not in st.session_state:
     st.session_state.started = False
+# Fetch public IP
 if "user_ip" not in st.session_state:
     try:
         ip_resp = requests.get("https://api.ipify.org?format=json", timeout=3)
         st.session_state.user_ip = ip_resp.json().get("ip", "unknown")
     except Exception:
         st.session_state.user_ip = "unknown"
+
+# Generate or retrieve a persistent device ID stored in the browser via cookie
+if "device_id" not in st.session_state:
+    device_id_js = streamlit_js_eval(js_expressions="""
+        (function() {
+            let id = document.cookie.split('; ').find(r => r.startsWith('lungiq_device_id='));
+            if (id) {
+                return id.split('=')[1];
+            } else {
+                let newId = 'dev_' + Math.random().toString(36).substr(2, 12) + Date.now().toString(36);
+                let expires = new Date();
+                expires.setFullYear(expires.getFullYear() + 2);
+                document.cookie = 'lungiq_device_id=' + newId + '; expires=' + expires.toUTCString() + '; path=/; SameSite=Lax';
+                return newId;
+            }
+        })()
+    """, key="get_device_id")
+    st.session_state.device_id = device_id_js if device_id_js else "unknown"
 
 # ─────────────────────────────────────────
 #  ZIP DATA — Indiana ZIPs (kept for curated screening lookup)
@@ -914,7 +934,8 @@ if run:
 
     log_usage({
         "timestamp": datetime.datetime.now().isoformat(),
-        "user_id": st.session_state.user_ip,
+        "user_id": st.session_state.device_id,
+        "ip_address": st.session_state.user_ip,
         "zip": zip_code or "",
         "state": get_state_from_zip(zip_code) or "",
         "area_type": area_type,                        # ← new field
