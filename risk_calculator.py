@@ -1,6 +1,5 @@
 import streamlit as st
 import numpy as np
-import uuid
 import datetime
 import os
 import csv
@@ -282,8 +281,6 @@ hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
 # ─────────────────────────────────────────
 #  SESSION STATE
 # ─────────────────────────────────────────
-if "user_id" not in st.session_state:
-    st.session_state.user_id = str(uuid.uuid4())
 if "started" not in st.session_state:
     st.session_state.started = False
 if "user_ip" not in st.session_state:
@@ -917,8 +914,7 @@ if run:
 
     log_usage({
         "timestamp": datetime.datetime.now().isoformat(),
-        "user_id": st.session_state.user_id,
-        "ip_address": st.session_state.user_ip,       # ← device fingerprint
+        "user_id": st.session_state.user_ip,
         "zip": zip_code or "",
         "state": get_state_from_zip(zip_code) or "",
         "area_type": area_type,                        # ← new field
