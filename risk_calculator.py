@@ -7,6 +7,8 @@ import csv
 import math
 import requests
 
+SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"
+
 # ─────────────────────────────────────────
 #  PAGE CONFIG
 # ─────────────────────────────────────────
@@ -941,10 +943,9 @@ def get_nearby_locations(zip_code):
 # ─────────────────────────────────────────
 #  LOGGING
 # ─────────────────────────────────────────
-SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZPiifkLT7iaqfv7JVWLEcQkYnRIjk2q0iAq5zsY7NFaVa3hcEnh7Hdq37DmpNB28Y/exec"  # paste your Apps Script URL
-
+log_file = "usage_log.csv"
 def log_usage(data):
-    # Local CSV backup (still works)
+    # Local CSV backup
     exists = os.path.isfile(log_file)
     with open(log_file, "a", newline="") as f:
         fields = list(data.keys())
@@ -952,8 +953,7 @@ def log_usage(data):
         if not exists:
             w.writeheader()
         w.writerow(data)
-
-    # Send to Google Sheets
+    # Send to Google Sheets via Apps Script webhook
     try:
         requests.post(SHEETS_WEBHOOK, json=data, timeout=5)
     except Exception:
@@ -1259,24 +1259,24 @@ if run:
         "family_hist": family_hist, "cigs": cigs, "years": years,
     }
 
-log_usage({
-    "timestamp": datetime.datetime.now().isoformat(),
-    "user_id": st.session_state.user_id,
-    "zip": zip_code or "",
-    "age": age,
-    "race": race,
-    "education": education,
-    "bmi": round(bmi, 1),
-    "smoking_status": smoking,
-    "pack_years": round(pack_years, 1),
-    "copd": copd,
-    "cancer_hist": cancer_hist,
-    "family_hist": family_hist,
-    "risk_pct": round(risk_pct, 3),
-    "risk_group": category,
-    "lung_age": lung_age_val,
-    "uspstf_eligible": qualifies,
-})
+    log_usage({
+        "timestamp": datetime.datetime.now().isoformat(),
+        "user_id": st.session_state.user_id,
+        "zip": zip_code or "",
+        "age": age,
+        "race": race,
+        "education": education,
+        "bmi": round(bmi, 1),
+        "smoking_status": smoking,
+        "pack_years": round(pack_years, 1),
+        "copd": copd,
+        "cancer_hist": cancer_hist,
+        "family_hist": family_hist,
+        "risk_pct": round(risk_pct, 3),
+        "risk_group": category,
+        "lung_age": lung_age_val,
+        "uspstf_eligible": qualifies,
+    })
 
 if "results" in st.session_state:
     r = st.session_state.results
@@ -1329,7 +1329,7 @@ if "results" in st.session_state:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Nearby Locations ──
+    # ── Nearby Screening Locations ──
     nearby = get_nearby_locations(zip_code) if zip_code and len(zip_code) == 5 else []
     if nearby:
         st.markdown('<div class="section-label">📍 Screening Centers Near You</div>', unsafe_allow_html=True)
