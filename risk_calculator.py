@@ -320,7 +320,8 @@ nav {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Age</label>
-                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track">
+                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track" oninput="validateAge(this)">
+                <p id="ageError" class="text-rose-400 text-sm font-bold mt-2 hidden">You must be at least 20 years old to use this tool.</p>
               </div>
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Race / Ethnicity <span class="text-slate-500 font-normal text-sm ml-1">(Optional)</span></label>
@@ -376,7 +377,15 @@ nav {
               <label class="block text-base text-slate-400 mb-4 uppercase tracking-widest text-xs font-bold">Medical History</label>
               <div class="grid grid-cols-3 gap-6 items-end">
                 <div>
-                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem]">COPD?</label>
+                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem] flex items-center gap-2">
+                    COPD?
+                    <span class="relative group">
+                      <span class="w-5 h-5 rounded-full bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-help">?</span>
+                      <span class="absolute bottom-7 left-1/2 -translate-x-1/2 w-64 bg-slate-900 text-white text-xs font-normal p-3 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 leading-relaxed border border-slate-600">
+                        <strong class="block mb-1 text-blue-300">COPD</strong> (Chronic Obstructive Pulmonary Disease) is a lung condition that blocks airflow, causing shortness of breath. It includes emphysema and chronic bronchitis, and is often caused by long-term smoking.
+                      </span>
+                    </span>
+                  </label>
                   <div class="select-wrapper">
                     <select id="copd" class="w-full input-dark rounded-xl p-4 text-base font-bold">
                       <option value="0">No</option>
@@ -475,7 +484,7 @@ nav {
             <span id="submitText">Calculate My Lung Risk</span>
           </button>
           <p class="text-sm text-slate-400 mt-8 flex items-center justify-center">
-            <i class="ph-fill ph-shield-check mr-2"></i> All data collected is completely anonymous. Never stored or sold.
+            <i class="ph-fill ph-shield-check mr-2"></i> All data collected is completely anonymous.
           </p>
         </div>
       </form>
@@ -1195,6 +1204,16 @@ function updateFormProgress() {
   const fields = ['zipCode', 'areaType', 'insurance', 'age', 'smokingStatus', 'barrierHidden'];
   fields.forEach(id => { if (document.getElementById(id).value !== "") filled++; });
   document.getElementById('fieldsComplete').innerText = `${filled} of 6 fields complete`;
+}
+function validateAge(input) {
+  const err = document.getElementById('ageError');
+  if (input.value && parseInt(input.value) < 30) {
+    err.classList.remove('hidden');
+    input.setCustomValidity('Must be at least 30');
+  } else {
+    err.classList.add('hidden');
+    input.setCustomValidity('');
+  }
 }
 
 function validateZip() {
