@@ -1,1093 +1,2355 @@
-import streamlit as st
-import numpy as np
-import datetime
-import os
-import csv
-import math
-import requests
-import hashlib
-from streamlit_js_eval import streamlit_js_eval
-
-SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbywtTErvM079-3bMSXw6MzADhJRZMiZydxbYy3PqE0_1pwQ_wKqLpU9QBiGKLPDZRor/exec"
-
-# ─────────────────────────────────────────
-#  PAGE CONFIG
-# ─────────────────────────────────────────
-st.set_page_config(
-    page_title="LungIQ · Lung Health Risk Tool",
-    page_icon="🫁",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
-
-# ─────────────────────────────────────────
-#  GLOBAL CSS
-# ─────────────────────────────────────────
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
-
-*, *::before, *::after { box-sizing: border-box; }
-
-html, body, [data-testid="stAppViewContainer"] {
-    background: #F2F4F8 !important;
-    font-family: 'DM Sans', sans-serif;
-    color: #1A1F2E;
-}
-
-[data-testid="stAppViewContainer"] > .main { background: #F2F4F8 !important; }
-[data-testid="block-container"] { padding: 0 !important; max-width: 780px; margin: 0 auto; }
-header, footer { display: none !important; }
-[data-testid="stSidebar"] { display: none !important; }
-
-.hero-wrap {
-    background: linear-gradient(135deg, #0A1628 0%, #0D2952 55%, #0F3A72 100%);
-    padding: 60px 40px 50px;
-    text-align: center;
-    border-radius: 0 0 32px 32px;
-    margin-bottom: 40px;
-    position: relative;
-    overflow: hidden;
-}
-.hero-wrap::before {
-    content: '';
-    position: absolute;
-    top: -40px; right: -40px;
-    width: 260px; height: 260px;
-    background: radial-gradient(circle, rgba(64,160,255,0.18) 0%, transparent 70%);
-    border-radius: 50%;
-}
-.hero-wrap::after {
-    content: '';
-    position: absolute;
-    bottom: -60px; left: -30px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(64,200,180,0.12) 0%, transparent 70%);
-    border-radius: 50%;
-}
-.hero-badge {
-    display: inline-block;
-    background: rgba(64,160,255,0.18);
-    border: 1px solid rgba(64,160,255,0.35);
-    color: #7EC8FF;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding: 6px 18px;
-    border-radius: 100px;
-    margin-bottom: 20px;
-}
-.hero-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 52px;
-    font-weight: 400;
-    color: #FFFFFF;
-    line-height: 1.1;
-    margin: 0 0 16px;
-    letter-spacing: -1px;
-}
-.hero-title em { color: #7EC8FF; font-style: italic; }
-.hero-sub {
-    font-size: 17px;
-    color: rgba(255,255,255,0.65);
-    max-width: 480px;
-    margin: 0 auto 32px;
-    line-height: 1.65;
-    font-weight: 300;
-}
-.hero-stats {
-    display: flex;
-    justify-content: center;
-    gap: 40px;
-    margin-top: 32px;
-    padding-top: 28px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-}
-.stat-item { text-align: center; }
-.stat-num {
-    font-family: 'DM Serif Display', serif;
-    font-size: 28px;
-    color: #7EC8FF;
-    display: block;
-}
-.stat-label {
-    font-size: 11px;
-    color: rgba(255,255,255,0.5);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    font-weight: 500;
-}
-
-.section-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: #6B7A99;
-    margin-bottom: 14px;
-    margin-top: 32px;
-    padding-left: 2px;
-}
-
-.card {
-    background: #FFFFFF;
-    border-radius: 20px;
-    padding: 28px 30px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
-}
-.card-title {
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #8A94B0;
-    margin-bottom: 18px;
-}
-
-.tooltip-wrap { display: inline; position: relative; }
-.info-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px; height: 18px;
-    background: #E8EDFB;
-    color: #4A7BCC;
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: default;
-    margin-left: 6px;
-    vertical-align: middle;
-    border: none;
-    line-height: 1;
-}
-.tooltip-text {
-    visibility: hidden;
-    opacity: 0;
-    background: #1A1F2E;
-    color: #E8EDFB;
-    font-size: 12.5px;
-    line-height: 1.55;
-    font-weight: 400;
-    border-radius: 10px;
-    padding: 12px 14px;
-    position: absolute;
-    z-index: 100;
-    bottom: 130%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 260px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    transition: opacity 0.18s ease;
-    pointer-events: none;
-}
-.tooltip-text::after {
-    content: '';
-    position: absolute;
-    top: 100%; left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-top-color: #1A1F2E;
-}
-.tooltip-wrap:hover .tooltip-text { visibility: visible; opacity: 1; }
-
-.result-panel {
-    border-radius: 24px;
-    padding: 36px 36px 32px;
-    margin-bottom: 24px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-.result-panel.high { background: linear-gradient(135deg, #FFF0F0 0%, #FFE4E4 100%); border: 1px solid #FFCCCC; }
-.result-panel.low { background: linear-gradient(135deg, #F0FFF8 0%, #E2F9EE 100%); border: 1px solid #B8EDD4; }
-.result-panel.moderate { background: linear-gradient(135deg, #FFFBF0 0%, #FFF3D9 100%); border: 1px solid #FFE0A0; }
-
-.lung-age-label { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #6B7A99; margin-bottom: 8px; }
-.lung-age-value { font-family: 'DM Serif Display', serif; font-size: 80px; line-height: 1; margin-bottom: 4px; letter-spacing: -3px; }
-.lung-age-value.high { color: #C62828; }
-.lung-age-value.low { color: #1B7A48; }
-.lung-age-value.moderate { color: #B06A00; }
-
-.lung-age-diff { font-size: 14px; font-weight: 500; color: #8A94B0; margin-bottom: 20px; }
-.risk-badge {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 9px 22px; border-radius: 100px; font-size: 14px; font-weight: 600; margin-bottom: 20px;
-}
-.risk-badge.high { background: #C62828; color: white; }
-.risk-badge.low { background: #1B7A48; color: white; }
-.risk-badge.moderate { background: #D47D00; color: white; }
-.risk-pct { font-size: 13px; color: #6B7A99; }
-
-.rec-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px 0; border-bottom: 1px solid #F0F2F8; }
-.rec-item:last-child { border-bottom: none; }
-.rec-icon { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-.rec-icon.screen { background: #EBF2FF; }
-.rec-icon.warn { background: #FFF3E0; }
-.rec-icon.ok { background: #E8F7EE; }
-.rec-icon.quit { background: #FBE9E7; }
-.rec-head { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
-.rec-sub { font-size: 13px; color: #6B7A99; line-height: 1.5; }
-
-.sim-block { background: #F7F9FE; border: 1px solid #E4E9F6; border-radius: 16px; padding: 20px 22px; margin-top: 16px; }
-.sim-result { font-family: 'DM Serif Display', serif; font-size: 36px; color: #1B7A48; text-align: center; margin: 8px 0; }
-
-.qualify-yes { background: #EBF2FF; border: 1.5px solid #7EB3FF; border-radius: 14px; padding: 18px 20px; font-size: 14px; color: #0D2952; line-height: 1.55; }
-.qualify-no { background: #F7F9FE; border: 1px solid #DDE3F0; border-radius: 14px; padding: 18px 20px; font-size: 14px; color: #4A5578; line-height: 1.55; }
-
-.stButton > button {
-    background: linear-gradient(135deg, #1557B0, #1E7DE0) !important;
-    color: white !important; border: none !important; border-radius: 14px !important;
-    padding: 14px 36px !important; font-size: 16px !important; font-weight: 600 !important;
-    font-family: 'DM Sans', sans-serif !important; width: 100% !important;
-    cursor: pointer !important; transition: all 0.2s !important;
-    box-shadow: 0 4px 16px rgba(21,87,176,0.3) !important; letter-spacing: 0.2px !important;
-}
-.stButton > button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 22px rgba(21,87,176,0.38) !important; }
-
-[data-testid="stTextInput"] input,
-[data-testid="stNumberInput"] input,
-[data-testid="stSelectbox"] > div {
-    border-radius: 10px !important; border-color: #DDE3F0 !important;
-    font-family: 'DM Sans', sans-serif !important; font-size: 15px !important;
-}
-[data-testid="stSelectbox"] > div:focus-within { border-color: #1557B0 !important; box-shadow: 0 0 0 3px rgba(21,87,176,0.12) !important; }
-
-label, [data-testid="stWidgetLabel"] { font-family: 'DM Sans', sans-serif !important; font-weight: 500 !important; font-size: 14px !important; color: #2A3148 !important; }
-[data-testid="stSlider"] > div > div > div { background: #1557B0 !important; }
-hr { border: none; border-top: 1px solid #E8ECF4; margin: 32px 0; }
-
-.footer { text-align: center; font-size: 12px; color: #9AA3BE; padding: 24px 20px 40px; line-height: 1.7; }
-
-.zip-valid [data-testid="stTextInput"] input { border-color: #1B7A48 !important; box-shadow: 0 0 0 3px rgba(27,122,72,0.12) !important; background: #F0FFF8 !important; }
-.zip-status { font-size: 12.5px; font-weight: 500; margin-top: -10px; margin-bottom: 8px; padding: 0 2px; }
-.zip-status.ok { color: #1B7A48; }
-.zip-status.warn { color: #B06A00; }
-
-.loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
-.loc-card { background: #F7F9FE; border: 1px solid #DDE3F0; border-radius: 14px; padding: 14px 16px; font-size: 13px; line-height: 1.55; }
-.loc-name { font-weight: 600; color: #0D2952; font-size: 13.5px; margin-bottom: 3px; }
-.loc-dist { display: inline-block; background: #EBF2FF; color: #1557B0; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px; margin-bottom: 6px; }
-.loc-addr { color: #6B7A99; font-size: 12px; }
-.loc-phone { color: #4A7BCC; font-size: 12px; font-weight: 500; }
-
-.age-warn { background: #FFF8E1; border-left: 4px solid #FFC107; border-radius: 0 10px 10px 0; padding: 14px 18px; font-size: 13.5px; color: #5D4037; margin-bottom: 12px; line-height: 1.55; }
-
-.loading-box {
-    background: #EBF2FF;
-    border: 1.5px solid #7EB3FF;
-    border-radius: 16px;
-    padding: 22px 24px;
-    text-align: center;
-    font-size: 15px;
-    color: #0D2952;
-    font-weight: 500;
-    margin: 20px 0;
-}
-.loading-box .spinner { font-size: 28px; display: block; margin-bottom: 10px; }
-
-[data-testid="stNumberInput"]:has(input[aria-label="Age"]) button { display: none !important; }
-[data-testid="stNumberInput"]:has(input[aria-label="Age"]) > div { gap: 0 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────
-#  SESSION STATE
-# ─────────────────────────────────────────
-if "started" not in st.session_state:
-    st.session_state.started = False
-if "calculating" not in st.session_state:
-    st.session_state.calculating = False
-
-# Build a server-side device fingerprint from request headers
-if "device_id" not in st.session_state:
-    try:
-        headers = st.context.headers
-        user_agent = headers.get("User-Agent", "")
-        accept_lang = headers.get("Accept-Language", "")
-        accept_enc = headers.get("Accept-Encoding", "")
-        raw = f"{user_agent}|{accept_lang}|{accept_enc}"
-        fingerprint = "fp_" + hashlib.md5(raw.encode()).hexdigest()[:16]
-        st.session_state.device_id = fingerprint
-    except Exception:
-        st.session_state.device_id = "unknown"
-
-# ─────────────────────────────────────────
-#  ZIP DATA — Indiana ZIPs
-# ─────────────────────────────────────────
-indiana_zips = {
-    "46201","46202","46203","46204","46205","46206","46207","46208",
-    "46209","46210","46211","46214","46216","46217","46218","46219",
-    "46220","46221","46222","46224","46225","46226","46227","46228",
-    "46229","46230","46231","46234","46235","46236","46237","46239",
-    "46240","46241","46242","46244","46247","46249","46250","46251",
-    "46253","46254","46255","46256","46259","46260","46262","46268",
-    "46274","46275","46277","46278","46280","46282","46283","46285",
-    "46290","46291","46295","46296","46298",
-    "46032","46033","46034","46036","46037","46038","46040","46055",
-    "46060","46061","46062","46063","46064","46074","46082",
-    "46077","46112","46113","46118","46121","46122","46123","46149",
-    "46158","46167",
-    "46107","46131","46142","46143","46160","46161","46162","46163",
-    "46164","46181","46183","46184",
-    "46052","46075","46077",
-    "46105","46120","46124","46128","46135","46157","46165","46170",
-    "46172",
-    "46106","46151","46158","46166",
-    "46001","46011","46012","46013","46014","46015","46016","46017",
-    "46030","46044","46045","46048","46049","46050","46051","46058",
-    "46065","46069","46070","46071","46072","46076",
-    "46140","46148","46150","46155","46156",
-    "46176",
-    "47201","47202","47203",
-    "47401","47402","47403","47404","47405","47406","47407","47408",
-    "47901","47902","47903","47904","47905","47906","47907","47909",
-    "46801","46802","46803","46804","46805","46806","46807","46808",
-    "46809","46814","46815","46816","46818","46819","46825","46835",
-    "46845",
-    "46530","46545","46550","46552","46554","46556","46560","46561",
-    "46563","46565","46567","46570","46571","46572","46573","46574",
-    "46580","46581","46582","46590","46595","46601","46604","46613",
-    "46614","46615","46616","46617","46619","46620","46624","46626",
-    "46628","46629","46634","46635","46637","46660","46680","46699",
-    "46301","46302","46303","46304","46320","46321","46322","46323",
-    "46324","46325","46327","46340","46341","46342","46345","46346",
-    "46347","46348","46349","46350","46351","46352","46355","46356",
-    "46373","46374","46375","46376","46377","46379","46380","46381",
-    "46382","46383","46384","46385","46390","46391","46392","46393",
-    "46394","46395","46396","46397","46398","46399","46401","46402",
-    "46403","46404","46405","46406","46407","46408","46409","46410",
-    "46411",
-    "46514","46515","46516","46517","46526","46527","46528",
-    "46901","46902","46903","46904",
-    "47302","47303","47304","47305","47306","47307","47308",
-    "47801","47802","47803","47804","47805","47807","47809",
-    "47710","47711","47712","47713","47714","47715","47720","47721",
-    "47722","47724","47725","47728",
-    "47129","47130","47131","47132","47133","47134","47135","47136",
-    "47140","47141","47142","47143","47144","47145","47146","47147",
-    "47150","47151","47152","47160","47161","47162","47163","47164",
-    "47165","47166","47167","47168","47170","47172","47174","47175",
-    "47374","47375","47376",
-    "47542","47546","47547","47549","47550","47553","47556","47557",
-    "47558","47561","47562","47564","47567","47568","47573","47574",
-    "47575","47576","47577","47578","47579","47580","47581","47584",
-    "47585","47586","47588","47590","47591","47596","47597","47598",
-    "47601","47610","47611","47612","47613","47614","47615","47616",
-    "47617","47618","47619","47620","47629","47630","47631","47633",
-    "47634","47635","47637","47638","47639","47640","47647","47648",
-    "47649","47654","47660","47665","47666","47670","47683","47701",
-    "47702","47703","47704","47705","47706","47708",
-}
-
-# ─────────────────────────────────────────
-#  STATE SCREENING FALLBACK
-# ─────────────────────────────────────────
-STATE_SCREENING_FALLBACK = {
-    "AL": [{"name": "UAB Comprehensive Cancer Center", "address": "1802 6th Ave S, Birmingham, AL 35233", "phone": "(205) 934-5077"}],
-    "AK": [{"name": "Providence Alaska Cancer Center", "address": "3340 Providence Dr, Anchorage, AK 99508", "phone": "(907) 212-3500"}],
-    "AZ": [{"name": "Banner MD Anderson Cancer Center", "address": "2946 E Banner Gateway Dr, Gilbert, AZ 85234", "phone": "(480) 256-6444"}],
-    "AR": [{"name": "Winthrop P. Rockefeller Cancer Institute", "address": "4320 W Markham St, Little Rock, AR 72205", "phone": "(501) 686-8000"}],
-    "CA": [{"name": "UCLA Lung Cancer Screening", "address": "200 Medical Plaza, Los Angeles, CA 90095", "phone": "(310) 267-9400"}],
-    "CO": [{"name": "UCHealth Lung Screening – Denver", "address": "1665 Aurora Ct, Aurora, CO 80045", "phone": "(720) 848-0000"}],
-    "CT": [{"name": "Yale Cancer Center – Lung Screening", "address": "35 Park St, New Haven, CT 06519", "phone": "(203) 785-4095"}],
-    "DE": [{"name": "Christiana Care Helen F. Graham Cancer Center", "address": "4701 Ogletown-Stanton Rd, Newark, DE 19713", "phone": "(302) 623-4500"}],
-    "FL": [{"name": "Moffitt Cancer Center – Lung Screening", "address": "12902 USF Magnolia Dr, Tampa, FL 33612", "phone": "(813) 745-4673"}],
-    "GA": [{"name": "Winship Cancer Institute – Emory", "address": "1365 Clifton Rd NE, Atlanta, GA 30322", "phone": "(404) 778-1900"}],
-    "HI": [{"name": "University of Hawaii Cancer Center", "address": "701 Ilalo St, Honolulu, HI 96813", "phone": "(808) 586-3010"}],
-    "ID": [{"name": "St. Luke's Mountain States Tumor Institute", "address": "100 E Idaho St, Boise, ID 83712", "phone": "(208) 381-2711"}],
-    "IL": [{"name": "Robert H. Lurie Comprehensive Cancer Center", "address": "675 N St. Clair St, Chicago, IL 60611", "phone": "(312) 695-0990"}],
-    "IN": [{"name": "IU Health Melvin & Bren Simon Cancer Center", "address": "535 Barnhill Dr, Indianapolis, IN 46202", "phone": "(317) 944-5000"}],
-    "IA": [{"name": "University of Iowa Holden Comprehensive Cancer Center", "address": "200 Hawkins Dr, Iowa City, IA 52242", "phone": "(319) 356-4200"}],
-    "KS": [{"name": "University of Kansas Cancer Center", "address": "4350 Shawnee Mission Pkwy, Westwood, KS 66205", "phone": "(913) 588-1227"}],
-    "KY": [{"name": "UK Markey Cancer Center – Lung Screening", "address": "800 Rose St, Lexington, KY 40536", "phone": "(859) 257-4500"}],
-    "LA": [{"name": "LSU Health New Orleans – Feist-Weiller Cancer Center", "address": "1501 Kings Hwy, Shreveport, LA 71103", "phone": "(318) 675-5000"}],
-    "ME": [{"name": "Maine Medical Center – Cancer Care", "address": "22 Bramhall St, Portland, ME 04102", "phone": "(207) 662-0111"}],
-    "MD": [{"name": "Johns Hopkins Sidney Kimmel Cancer Center", "address": "401 N Broadway, Baltimore, MD 21231", "phone": "(410) 955-8964"}],
-    "MA": [{"name": "Dana-Farber/Brigham Lung Screening", "address": "450 Brookline Ave, Boston, MA 02215", "phone": "(617) 632-3000"}],
-    "MI": [{"name": "University of Michigan Rogel Cancer Center", "address": "1500 E Medical Center Dr, Ann Arbor, MI 48109", "phone": "(800) 865-1125"}],
-    "MN": [{"name": "Mayo Clinic – Lung Cancer Screening", "address": "200 First St SW, Rochester, MN 55905", "phone": "(507) 284-2511"}],
-    "MS": [{"name": "University of Mississippi Medical Center – Cancer Center", "address": "2500 N State St, Jackson, MS 39216", "phone": "(601) 984-5590"}],
-    "MO": [{"name": "Siteman Cancer Center – Washington University", "address": "4921 Parkview Pl, St. Louis, MO 63110", "phone": "(314) 747-7222"}],
-    "MT": [{"name": "Billings Clinic Cancer Center", "address": "2800 10th Ave N, Billings, MT 59101", "phone": "(406) 238-2501"}],
-    "NE": [{"name": "Fred & Pamela Buffett Cancer Center", "address": "987680 Nebraska Medical Center, Omaha, NE 68198", "phone": "(402) 559-5600"}],
-    "NV": [{"name": "Nevada Cancer Research Foundation – Las Vegas", "address": "3838 Meadows Ln, Las Vegas, NV 89107", "phone": "(702) 384-0013"}],
-    "NH": [{"name": "Dartmouth Health Norris Cotton Cancer Center", "address": "1 Medical Center Dr, Lebanon, NH 03756", "phone": "(603) 650-5527"}],
-    "NJ": [{"name": "Rutgers Cancer Institute of New Jersey", "address": "195 Little Albany St, New Brunswick, NJ 08903", "phone": "(732) 235-2465"}],
-    "NM": [{"name": "UNM Comprehensive Cancer Center", "address": "1201 Camino de Salud NE, Albuquerque, NM 87102", "phone": "(505) 272-4946"}],
-    "NY": [{"name": "Memorial Sloan Kettering – Lung Screening", "address": "1275 York Ave, New York, NY 10065", "phone": "(212) 639-2000"}],
-    "NC": [{"name": "UNC Lineberger Comprehensive Cancer Center", "address": "450 West Dr, Chapel Hill, NC 27599", "phone": "(984) 974-8200"}],
-    "ND": [{"name": "Sanford Cancer Center – Fargo", "address": "801 Broadway N, Fargo, ND 58122", "phone": "(701) 234-2000"}],
-    "OH": [{"name": "Cleveland Clinic Taussig Cancer Institute", "address": "9500 Euclid Ave, Cleveland, OH 44195", "phone": "(216) 444-7923"}],
-    "OK": [{"name": "OU Health Stephenson Cancer Center", "address": "800 NE 10th St, Oklahoma City, OK 73104", "phone": "(405) 271-1111"}],
-    "OR": [{"name": "OHSU Knight Cancer Institute", "address": "3181 SW Sam Jackson Park Rd, Portland, OR 97239", "phone": "(503) 494-1617"}],
-    "PA": [{"name": "Penn Medicine Abramson Cancer Center", "address": "3400 Civic Center Blvd, Philadelphia, PA 19104", "phone": "(215) 662-6334"}],
-    "RI": [{"name": "Lifespan Cancer Institute – Providence", "address": "593 Eddy St, Providence, RI 02903", "phone": "(401) 444-8550"}],
-    "SC": [{"name": "MUSC Hollings Cancer Center", "address": "86 Jonathan Lucas St, Charleston, SC 29425", "phone": "(843) 792-9300"}],
-    "SD": [{"name": "Avera Cancer Institute – Sioux Falls", "address": "1000 E 23rd St, Sioux Falls, SD 57105", "phone": "(605) 322-3800"}],
-    "TN": [{"name": "Vanderbilt-Ingram Cancer Center", "address": "2220 Pierce Ave, Nashville, TN 37232", "phone": "(615) 936-1782"}],
-    "TX": [{"name": "MD Anderson Cancer Center – Lung Screening", "address": "1515 Holcombe Blvd, Houston, TX 77030", "phone": "(877) 632-6789"}],
-    "UT": [{"name": "Huntsman Cancer Institute – Lung Screening", "address": "2000 Circle of Hope Dr, Salt Lake City, UT 84112", "phone": "(801) 585-0303"}],
-    "VT": [{"name": "UVM Cancer Center", "address": "89 Beaumont Ave, Burlington, VT 05405", "phone": "(802) 656-4414"}],
-    "VA": [{"name": "UVA Cancer Center – Lung Screening", "address": "1240 Lee St, Charlottesville, VA 22908", "phone": "(434) 924-9333"}],
-    "WA": [{"name": "Seattle Cancer Care Alliance – Lung Screening", "address": "825 Eastlake Ave E, Seattle, WA 98109", "phone": "(206) 606-7222"}],
-    "WV": [{"name": "WVU Cancer Institute – Mary Babb Randolph", "address": "1 Medical Center Dr, Morgantown, WV 26506", "phone": "(304) 598-4500"}],
-    "WI": [{"name": "UW Carbone Cancer Center – Lung Screening", "address": "600 Highland Ave, Madison, WI 53792", "phone": "(608) 265-1700"}],
-    "WY": [{"name": "Wyoming Cancer Program – Cheyenne", "address": "2301 House Ave, Cheyenne, WY 82001", "phone": "(307) 635-4141"}],
-    "DC": [{"name": "Georgetown Lombardi Comprehensive Cancer Center", "address": "3800 Reservoir Rd NW, Washington, DC 20007", "phone": "(202) 444-4000"}],
-    "PR": [{"name": "UPR Comprehensive Cancer Center", "address": "PMB 711, 89 De Diego Ave Suite 105, San Juan, PR 00927", "phone": "(787) 772-8300"}],
-}
-
-ZIP_PREFIX_TO_STATE = {
-    "005": "PR","006": "PR","007": "PR","008": "PR","009": "PR",
-    "010": "MA","011": "MA","012": "MA","013": "MA","014": "MA","015": "MA","016": "MA","017": "MA","018": "MA","019": "MA",
-    "020": "MA","021": "MA","022": "MA","023": "MA","024": "MA","025": "MA","026": "MA","027": "MA",
-    "028": "RI","029": "RI",
-    "030": "NH","031": "NH","032": "NH","033": "NH","034": "NH","035": "NH","036": "NH","037": "NH","038": "NH",
-    "039": "ME","040": "ME","041": "ME","042": "ME","043": "ME","044": "ME","045": "ME","046": "ME","047": "ME","048": "ME","049": "ME",
-    "050": "VT","051": "VT","052": "VT","053": "VT","054": "VT","056": "VT","057": "VT","058": "VT","059": "VT",
-    "060": "CT","061": "CT","062": "CT","063": "CT","064": "CT","065": "CT","066": "CT","067": "CT","068": "CT","069": "CT",
-    "070": "NJ","071": "NJ","072": "NJ","073": "NJ","074": "NJ","075": "NJ","076": "NJ","077": "NJ","078": "NJ","079": "NJ",
-    "080": "NJ","081": "NJ","082": "NJ","083": "NJ","084": "NJ","085": "NJ","086": "NJ","087": "NJ","088": "NJ","089": "NJ",
-    "100": "NY","101": "NY","102": "NY","103": "NY","104": "NY","105": "NY","106": "NY","107": "NY","108": "NY","109": "NY",
-    "110": "NY","111": "NY","112": "NY","113": "NY","114": "NY","115": "NY","116": "NY","117": "NY","118": "NY","119": "NY",
-    "120": "NY","121": "NY","122": "NY","123": "NY","124": "NY","125": "NY","126": "NY","127": "NY","128": "NY","129": "NY",
-    "130": "NY","131": "NY","132": "NY","133": "NY","134": "NY","135": "NY","136": "NY","137": "NY","138": "NY","139": "NY",
-    "140": "NY","141": "NY","142": "NY","143": "NY","144": "NY","145": "NY","146": "NY","147": "NY","148": "NY","149": "NY",
-    "150": "PA","151": "PA","152": "PA","153": "PA","154": "PA","155": "PA","156": "PA","157": "PA","158": "PA","159": "PA",
-    "160": "PA","161": "PA","162": "PA","163": "PA","164": "PA","165": "PA","166": "PA","167": "PA","168": "PA","169": "PA",
-    "170": "PA","171": "PA","172": "PA","173": "PA","174": "PA","175": "PA","176": "PA","177": "PA","178": "PA","179": "PA",
-    "180": "PA","181": "PA","182": "PA","183": "PA","184": "PA","185": "PA","186": "PA","187": "PA","188": "PA","189": "PA",
-    "190": "PA","191": "PA","192": "PA","193": "PA","194": "PA","195": "PA","196": "PA",
-    "197": "DE","198": "DE","199": "DE",
-    "200": "DC","201": "DC","202": "DC","203": "DC","204": "DC","205": "DC",
-    "206": "MD","207": "MD","208": "MD","209": "MD","210": "MD","211": "MD","212": "MD","213": "MD","214": "MD",
-    "215": "MD","216": "MD","217": "MD","218": "MD","219": "MD",
-    "220": "VA","221": "VA","222": "VA","223": "VA","224": "VA","225": "VA","226": "VA","227": "VA","228": "VA","229": "VA",
-    "230": "VA","231": "VA","232": "VA","233": "VA","234": "VA","235": "VA","236": "VA","237": "VA","238": "VA","239": "VA",
-    "240": "VA","241": "VA","242": "VA","243": "VA","244": "VA","245": "VA","246": "VA",
-    "247": "WV","248": "WV","249": "WV","250": "WV","251": "WV","252": "WV","253": "WV","254": "WV","255": "WV",
-    "256": "WV","257": "WV","258": "WV","259": "WV","260": "WV","261": "WV","262": "WV","263": "WV","264": "WV","265": "WV",
-    "266": "WV","267": "WV","268": "WV",
-    "270": "NC","271": "NC","272": "NC","273": "NC","274": "NC","275": "NC","276": "NC","277": "NC","278": "NC","279": "NC",
-    "280": "NC","281": "NC","282": "NC","283": "NC","284": "NC","285": "NC","286": "NC","287": "NC","288": "NC","289": "NC",
-    "290": "SC","291": "SC","292": "SC","293": "SC","294": "SC","295": "SC","296": "SC","297": "SC","298": "SC","299": "SC",
-    "300": "GA","301": "GA","302": "GA","303": "GA","304": "GA","305": "GA","306": "GA","307": "GA","308": "GA","309": "GA",
-    "310": "GA","311": "GA","312": "GA","313": "GA","314": "GA","315": "GA","316": "GA","317": "GA","318": "GA","319": "GA",
-    "320": "FL","321": "FL","322": "FL","323": "FL","324": "FL","325": "FL","326": "FL","327": "FL","328": "FL","329": "FL",
-    "330": "FL","331": "FL","332": "FL","333": "FL","334": "FL","335": "FL","336": "FL","337": "FL","338": "FL",
-    "339": "FL","340": "FL","341": "FL","342": "FL","344": "FL","346": "FL","347": "FL","349": "FL",
-    "350": "AL","351": "AL","352": "AL","354": "AL","355": "AL","356": "AL","357": "AL","358": "AL","359": "AL",
-    "360": "AL","361": "AL","362": "AL","363": "AL","364": "AL","365": "AL","366": "AL","367": "AL","368": "AL","369": "AL",
-    "370": "TN","371": "TN","372": "TN","373": "TN","374": "TN","375": "TN","376": "TN","377": "TN","378": "TN","379": "TN",
-    "380": "TN","381": "TN","382": "TN","383": "TN","384": "TN","385": "TN",
-    "386": "MS","387": "MS","388": "MS","389": "MS","390": "MS","391": "MS","392": "MS","393": "MS","394": "MS","395": "MS","396": "MS","397": "MS",
-    "398": "GA","399": "GA",
-    "400": "KY","401": "KY","402": "KY","403": "KY","404": "KY","405": "KY","406": "KY","407": "KY","408": "KY","409": "KY",
-    "410": "KY","411": "KY","412": "KY","413": "KY","414": "KY","415": "KY","416": "KY","417": "KY","418": "KY",
-    "420": "KY","421": "KY","422": "KY","423": "KY","424": "KY","425": "KY","426": "KY","427": "KY",
-    "430": "OH","431": "OH","432": "OH","433": "OH","434": "OH","435": "OH","436": "OH","437": "OH","438": "OH","439": "OH",
-    "440": "OH","441": "OH","442": "OH","443": "OH","444": "OH","445": "OH","446": "OH","447": "OH","448": "OH","449": "OH",
-    "450": "OH","451": "OH","452": "OH","453": "OH","454": "OH","455": "OH","456": "OH","457": "OH","458": "OH",
-    "460": "IN","461": "IN","462": "IN","463": "IN","464": "IN","465": "IN","466": "IN","467": "IN","468": "IN","469": "IN",
-    "470": "IN","471": "IN","472": "IN","473": "IN","474": "IN","475": "IN","476": "IN","477": "IN","478": "IN","479": "IN",
-    "480": "MI","481": "MI","482": "MI","483": "MI","484": "MI","485": "MI","486": "MI","487": "MI","488": "MI","489": "MI",
-    "490": "MI","491": "MI","492": "MI","493": "MI","494": "MI","495": "MI","496": "MI","497": "MI","498": "MI","499": "MI",
-    "500": "IA","501": "IA","502": "IA","503": "IA","504": "IA","505": "IA","506": "IA","507": "IA","508": "IA","509": "IA",
-    "510": "IA","511": "IA","512": "IA","513": "IA","514": "IA","515": "IA","516": "IA","520": "IA","521": "IA","522": "IA",
-    "523": "IA","524": "IA","525": "IA","526": "IA","527": "IA","528": "IA",
-    "530": "WI","531": "WI","532": "WI","534": "WI","535": "WI","537": "WI","538": "WI","539": "WI",
-    "540": "WI","541": "WI","542": "WI","543": "WI","544": "WI","545": "WI","546": "WI","547": "WI","548": "WI","549": "WI",
-    "550": "MN","551": "MN","553": "MN","554": "MN","555": "MN","556": "MN","557": "MN","558": "MN","559": "MN",
-    "560": "MN","561": "MN","562": "MN","563": "MN","564": "MN","565": "MN","566": "MN","567": "MN",
-    "570": "SD","571": "SD","572": "SD","573": "SD","574": "SD","575": "SD","576": "SD","577": "SD",
-    "580": "ND","581": "ND","582": "ND","583": "ND","584": "ND","585": "ND","586": "ND","587": "ND","588": "ND",
-    "590": "MT","591": "MT","592": "MT","593": "MT","594": "MT","595": "MT","596": "MT","597": "MT","598": "MT","599": "MT",
-    "600": "IL","601": "IL","602": "IL","603": "IL","604": "IL","605": "IL","606": "IL","607": "IL","608": "IL","609": "IL",
-    "610": "IL","611": "IL","612": "IL","613": "IL","614": "IL","615": "IL","616": "IL","617": "IL","618": "IL","619": "IL",
-    "620": "IL","621": "IL","622": "IL","623": "IL","624": "IL","625": "IL","626": "IL","627": "IL","628": "IL","629": "IL",
-    "630": "MO","631": "MO","633": "MO","634": "MO","635": "MO","636": "MO","637": "MO","638": "MO","639": "MO",
-    "640": "MO","641": "MO","644": "MO","645": "MO","646": "MO","647": "MO","648": "MO",
-    "650": "MO","651": "MO","652": "MO","653": "MO","654": "MO","655": "MO","656": "MO","657": "MO","658": "MO",
-    "660": "KS","661": "KS","662": "KS","664": "KS","665": "KS","666": "KS","667": "KS","668": "KS","669": "KS",
-    "670": "KS","671": "KS","672": "KS","673": "KS","674": "KS","675": "KS","676": "KS","677": "KS","678": "KS","679": "KS",
-    "680": "NE","681": "NE","683": "NE","684": "NE","685": "NE","686": "NE","687": "NE","688": "NE","689": "NE",
-    "690": "NE","691": "NE","692": "NE","693": "NE",
-    "700": "LA","701": "LA","703": "LA","704": "LA","705": "LA","706": "LA","707": "LA","708": "LA",
-    "710": "LA","711": "LA","712": "LA","713": "LA","714": "LA",
-    "716": "AR","717": "AR","718": "AR","719": "AR","720": "AR","721": "AR","722": "AR","723": "AR","724": "AR","725": "AR",
-    "726": "AR","727": "AR","728": "AR","729": "AR",
-    "730": "OK","731": "OK","733": "OK","734": "OK","735": "OK","736": "OK","737": "OK","738": "OK","739": "OK",
-    "740": "OK","741": "OK","743": "OK","744": "OK","745": "OK","746": "OK","747": "OK","748": "OK","749": "OK",
-    "750": "TX","751": "TX","752": "TX","753": "TX","754": "TX","755": "TX","756": "TX","757": "TX","758": "TX","759": "TX",
-    "760": "TX","761": "TX","762": "TX","763": "TX","764": "TX","765": "TX","766": "TX","767": "TX","768": "TX","769": "TX",
-    "770": "TX","771": "TX","772": "TX","773": "TX","774": "TX","775": "TX","776": "TX","777": "TX","778": "TX","779": "TX",
-    "780": "TX","781": "TX","782": "TX","783": "TX","784": "TX","785": "TX","786": "TX","787": "TX","788": "TX","789": "TX",
-    "790": "TX","791": "TX","792": "TX","793": "TX","794": "TX","795": "TX","796": "TX","797": "TX","798": "TX","799": "TX",
-    "800": "CO","801": "CO","802": "CO","803": "CO","804": "CO","805": "CO","806": "CO","807": "CO","808": "CO","809": "CO",
-    "810": "CO","811": "CO","812": "CO","813": "CO","814": "CO","815": "CO","816": "CO",
-    "820": "WY","821": "WY","822": "WY","823": "WY","824": "WY","825": "WY","826": "WY","827": "WY","828": "WY","829": "WY","830": "WY","831": "WY",
-    "832": "ID","833": "ID","834": "ID","835": "ID","836": "ID","837": "ID","838": "ID",
-    "840": "UT","841": "UT","842": "UT","843": "UT","844": "UT","845": "UT","846": "UT","847": "UT",
-    "850": "AZ","851": "AZ","852": "AZ","853": "AZ","855": "AZ","856": "AZ","857": "AZ","859": "AZ","860": "AZ","863": "AZ","864": "AZ","865": "AZ",
-    "870": "NM","871": "NM","872": "NM","873": "NM","874": "NM","875": "NM","877": "NM","878": "NM","879": "NM","880": "NM","881": "NM","882": "NM","883": "NM","884": "NM",
-    "885": "TX",
-    "890": "NV","891": "NV","893": "NV","894": "NV","895": "NV","897": "NV","898": "NV",
-    "900": "CA","901": "CA","902": "CA","903": "CA","904": "CA","905": "CA","906": "CA","907": "CA","908": "CA","910": "CA",
-    "911": "CA","912": "CA","913": "CA","914": "CA","915": "CA","916": "CA","917": "CA","918": "CA","919": "CA","920": "CA",
-    "921": "CA","922": "CA","923": "CA","924": "CA","925": "CA","926": "CA","927": "CA","928": "CA","930": "CA","931": "CA",
-    "932": "CA","933": "CA","934": "CA","935": "CA","936": "CA","937": "CA","938": "CA","939": "CA","940": "CA","941": "CA",
-    "942": "CA","943": "CA","944": "CA","945": "CA","946": "CA","947": "CA","948": "CA","949": "CA","950": "CA","951": "CA",
-    "952": "CA","953": "CA","954": "CA","955": "CA","956": "CA","957": "CA","958": "CA","959": "CA","960": "CA","961": "CA",
-    "967": "HI","968": "HI",
-    "970": "OR","971": "OR","972": "OR","973": "OR","974": "OR","975": "OR","976": "OR","977": "OR","978": "OR","979": "OR",
-    "980": "WA","981": "WA","982": "WA","983": "WA","984": "WA","985": "WA","986": "WA","988": "WA","989": "WA","990": "WA",
-    "991": "WA","992": "WA","993": "WA","994": "WA",
-    "995": "AK","996": "AK","997": "AK","998": "AK","999": "AK",
-}
-
-def get_state_from_zip(zip_code):
-    if not zip_code or len(zip_code) < 3:
-        return None
-    return ZIP_PREFIX_TO_STATE.get(zip_code[:3], None)
-
-# ─────────────────────────────────────────
-#  INDIANA SCREENING LOCATIONS
-# ─────────────────────────────────────────
-screening_locations = [
-    {"name": "IU Health North Hospital – Lung Screening", "address": "11700 N Meridian St, Carmel, IN 46032", "phone": "(317) 688-2000", "note": "LDCT lung screening; referral or self-referral accepted", "url": "https://iuhealth.org"},
-    {"name": "Ascension St. Vincent Carmel", "address": "13500 N Meridian St, Carmel, IN 46032", "phone": "(317) 582-7000", "note": "Comprehensive cancer screening & pulmonology", "url": "https://healthcare.ascension.org"},
-    {"name": "Community Health Network – North", "address": "8051 Clearvista Pkwy, Indianapolis, IN 46256", "phone": "(317) 621-5000", "note": "Low-dose CT lung screenings; most insurance accepted", "url": "https://ecommunity.com"},
-    {"name": "IU Health Methodist – Thoracic Oncology", "address": "1801 N Senate Blvd, Indianapolis, IN 46202", "phone": "(317) 962-2000", "note": "Academic medical center; high-risk lung program", "url": "https://iuhealth.org"},
-    {"name": "Franciscan Health Indianapolis", "address": "8111 S Emerson Ave, Indianapolis, IN 46237", "phone": "(317) 528-5000", "note": "Lung cancer screening; ACR-accredited imaging", "url": "https://franciscanhealth.org"},
-    {"name": "Aspire Indiana Health – Noblesville", "address": "1552 Union Chapel Rd, Noblesville, IN 46060", "phone": "(800) 342-5653", "note": "Community health center; sliding-scale fees available", "url": "https://aspireindiana.org"},
-    {"name": "IU Health Tipton Hospital", "address": "1000 S Main St, Tipton, IN 46072", "phone": "(765) 675-8500", "note": "Convenient for northern Hamilton County residents", "url": "https://iuhealth.org"},
-    {"name": "Hendricks Regional Health", "address": "1000 E Main St, Danville, IN 46122", "phone": "(317) 745-4451", "note": "Serves Hendricks County area; radiology & screening programs", "url": "https://hendricks.org"},
-    {"name": "Franciscan Health Mooresville", "address": "1201 Hadley Rd, Mooresville, IN 46158", "phone": "(317) 831-1160", "note": "Serves Morgan County; cancer screening available", "url": "https://franciscanhealth.org"},
-    {"name": "IU Health Morgan Hospital", "address": "2209 John R Wooden Dr, Martinsville, IN 46151", "phone": "(765) 342-8441", "note": "Morgan County lung screening services", "url": "https://iuhealth.org"},
-    {"name": "Putnam County Hospital", "address": "1542 Bloomington St, Greencastle, IN 46135", "phone": "(765) 653-5121", "note": "Serves Greencastle/DePauw area; imaging & screening", "url": "https://pchosp.org"},
-    {"name": "Franciscan Health Crawfordsville", "address": "1710 Lafayette Rd, Crawfordsville, IN 47933", "phone": "(765) 362-2800", "note": "Serves west-central Indiana; cancer screening programs", "url": "https://franciscanhealth.org"},
-    {"name": "IU Health Bloomington – Lung Screening", "address": "601 W 2nd St, Bloomington, IN 47403", "phone": "(812) 353-5555", "note": "Monroe County; comprehensive cancer & lung program", "url": "https://iuhealth.org"},
-    {"name": "IU Health Fort Wayne", "address": "700 Broadway, Fort Wayne, IN 46802", "phone": "(260) 450-5000", "note": "Allen County lung cancer screening & pulmonology", "url": "https://iuhealth.org"},
-    {"name": "Parkview Cancer Institute – Fort Wayne", "address": "11050 Parkview Circle, Fort Wayne, IN 46845", "phone": "(260) 266-4000", "note": "Dedicated cancer center; LDCT screening available", "url": "https://parkview.com"},
-    {"name": "Memorial Hospital – South Bend", "address": "615 N Michigan St, South Bend, IN 46601", "phone": "(574) 647-1000", "note": "St. Joseph County; lung screening & oncology", "url": "https://beaconhealthsystem.org"},
-    {"name": "Franciscan Health Lafayette", "address": "1701 S Creasy Ln, Lafayette, IN 47905", "phone": "(765) 502-4000", "note": "Serves Tippecanoe County; cancer screening programs", "url": "https://franciscanhealth.org"},
-    {"name": "Deaconess Cancer Institute – Evansville", "address": "600 Mary St, Evansville, IN 47747", "phone": "(812) 450-5000", "note": "SW Indiana; comprehensive lung cancer program", "url": "https://deaconess.com"},
-    {"name": "IU Health Ball Memorial – Muncie", "address": "2401 University Ave, Muncie, IN 47303", "phone": "(765) 747-3111", "note": "Delaware County; lung screening & pulmonology", "url": "https://iuhealth.org"},
-    {"name": "Reid Health – Richmond", "address": "1401 Chester Blvd, Richmond, IN 47374", "phone": "(765) 983-3000", "note": "Wayne County; cancer screening & imaging services", "url": "https://reidhealth.org"},
-]
-
-DEFAULT_LOCATIONS = [3, 0]
-
-def get_indiana_locations(zip_code):
-    fine = {
-        "46032": [0, 1], "46033": [0, 1], "46074": [0, 1], "46077": [0, 1],
-        "46060": [5, 2], "46062": [5, 2], "46038": [2, 0],
-        "46220": [2, 3], "46240": [2, 0], "46250": [2, 0],
-        "46256": [2, 0], "46280": [0, 2], "46290": [0, 2],
-        "46201": [3, 2], "46202": [3, 2], "46204": [3, 2],
-        "46205": [3, 2], "46208": [3, 2],
-        "46217": [4, 3], "46227": [4, 3], "46237": [4, 3],
-        "46142": [4, 3], "46143": [4, 3], "46131": [4, 3],
-        "46112": [7, 4], "46122": [7, 4], "46123": [7, 4],
-        "46158": [8, 9], "46151": [9, 8],
-        "46135": [10, 11], "46170": [10, 11], "46172": [10, 11],
-        "47933": [11, 16],
-        "47401": [12, 3], "47403": [12, 3], "47404": [12, 3],
-        "47405": [12, 3], "47408": [12, 3],
-        "46802": [13, 14], "46804": [13, 14], "46805": [13, 14],
-        "46814": [13, 14], "46845": [14, 13],
-        "46601": [15, 3], "46614": [15, 3], "46628": [15, 3],
-        "47901": [16, 3], "47904": [16, 3], "47906": [16, 3],
-        "47710": [17, 3], "47711": [17, 3], "47712": [17, 3],
-        "47303": [18, 3], "47304": [18, 3], "47306": [18, 3],
-        "47374": [19, 18],
-        "46901": [6, 2], "46902": [6, 2],
-        "46011": [2, 3], "46012": [2, 3], "46013": [2, 3],
-    }
-    routing = {
-        "462": [3, 2], "460": [0, 1], "474": [12, 3],
-        "468": [13, 14], "466": [15, 3], "479": [16, 3],
-        "477": [17, 3], "473": [18, 3],
-    }
-    if zip_code in fine:
-        idxs = fine[zip_code]
-    elif zip_code[:3] in routing:
-        idxs = routing[zip_code[:3]]
-    else:
-        idxs = DEFAULT_LOCATIONS
-    return [screening_locations[i] for i in idxs]
-
-def get_nearby_locations(zip_code):
-    if not zip_code or len(zip_code) != 5 or not zip_code.isdigit():
-        return [], None, None
-    state = get_state_from_zip(zip_code)
-    if zip_code in indiana_zips or state == "IN":
-        locs = get_indiana_locations(zip_code)
-        return [{"name": l["name"], "address": l["address"], "phone": l["phone"],
-                 "note": l.get("note", ""), "is_fallback": False} for l in locs], state, False
-    elif state and state in STATE_SCREENING_FALLBACK:
-        locs = STATE_SCREENING_FALLBACK[state]
-        return [{"name": l["name"], "address": l["address"], "phone": l["phone"],
-                 "note": "Major cancer center in your state", "is_fallback": True} for l in locs], state, True
-    else:
-        return [], state, None
-
-# ─────────────────────────────────────────
-#  LOGGING
-# ─────────────────────────────────────────
-log_file = "usage_log.csv"
-
-def log_usage(data):
-    exists = os.path.isfile(log_file)
-    with open(log_file, "a", newline="") as f:
-        fields = list(data.keys())
-        w = csv.DictWriter(f, fieldnames=fields)
-        if not exists:
-            w.writeheader()
-        w.writerow(data)
-    try:
-        requests.post(SHEETS_WEBHOOK, json=data, timeout=5)
-    except Exception:
-        pass
-
-# ─────────────────────────────────────────
-#  RISK MODEL (PLCOm2012)
-# ─────────────────────────────────────────
-def logistic(x):
-    return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
-
-def plco_m2012(age, race, education, bmi, copd, cancer_hist, family_hist,
-               smoking_status, smoking_intensity, duration_smoking, smoking_quit_time):
-    m = (
-          0.0778868  * (age - 62)
-        - 0.0812744  * (education - 4)
-        - 0.0274194  * (bmi - 27)
-        + 0.3553063  * copd
-        + 0.4589971  * cancer_hist
-        + 0.587185   * family_hist
-        + 0.2597431  * smoking_status
-        + 0.0317321  * (duration_smoking - 27)
-        - 0.0308572  * (smoking_quit_time - 10)
-        - 4.532506
-    )
-    if smoking_status == 1 and smoking_intensity > 0:
-        m += -1.822606 * ((smoking_intensity / 10) ** (-1) - 0.4021541613)
-    return logistic(m)
-
-def extrapolate_risk(age, race, education, bmi, copd, cancer_hist, family_hist,
-                     smoking_status, smoking_intensity, duration_smoking, smoking_quit_time):
-    if age < 40:
-        base_risk = plco_m2012(40, race, education, bmi, copd, cancer_hist, family_hist,
-                               smoking_status, smoking_intensity, duration_smoking, smoking_quit_time)
-        scale = math.exp(-0.065 * (40 - age))
-        return base_risk * scale
-    elif age > 80:
-        return plco_m2012(80, race, education, bmi, copd, cancer_hist, family_hist,
-                          smoking_status, smoking_intensity, duration_smoking, smoking_quit_time)
-    else:
-        return plco_m2012(age, race, education, bmi, copd, cancer_hist, family_hist,
-                          smoking_status, smoking_intensity, duration_smoking, smoking_quit_time)
-
-def lung_age_from_risk(actual_age, risk_pct):
-    if risk_pct <= 0.1:
-        offset = -8
-    elif risk_pct <= 0.5:
-        offset = -4
-    elif risk_pct < 1.3:
-        offset = 0
-    elif risk_pct < 3.0:
-        offset = int((risk_pct - 1.3) * 6)
-    elif risk_pct < 6.0:
-        offset = int(10 + (risk_pct - 3.0) * 4)
-    else:
-        offset = int(22 + (risk_pct - 6.0) * 2)
-    return max(10, min(100, actual_age + offset))
-
-def risk_category(risk_pct, age):
-    if risk_pct >= 3.0:
-        return "high", 3.0
-    elif risk_pct >= 1.3:
-        return "moderate", 1.3
-    else:
-        return "low", 1.3
-
-def uspstf_qualifies(age, smoking_status, pack_years):
-    if smoking_status == "Never":
-        return False, "Non-smokers do not qualify for USPSTF lung screening guidelines."
-    if age < 50 or age > 80:
-        return False, f"USPSTF guidelines apply to ages 50–80 (your age: {age})."
-    if pack_years < 20:
-        return False, f"USPSTF requires ≥20 pack-years (yours: {pack_years:.1f})."
-    return True, "You meet all USPSTF 2021 criteria for annual low-dose CT (LDCT) lung screening."
-
-def info_tip(label, tip_text):
-    return f"""
-    <span style="font-weight:500;color:#2A3148;">{label}</span>
-    <span class="tooltip-wrap">
-        <span class="info-btn">i</span>
-        <span class="tooltip-text">{tip_text}</span>
-    </span>
-    """
-
-# ─────────────────────────────────────────
-#  HERO / LANDING
-# ─────────────────────────────────────────
-if not st.session_state.started:
-    st.markdown("""
-    <div class="hero-wrap">
-        <div class="hero-badge">ALCSI Innovation · Lung Health Tool</div>
-        <div class="hero-title">Know your<br><em>LungIQ</em></div>
-        <div class="hero-sub">
-            A science-backed, 30-second risk assessment using the
-            clinically validated PLCOm2012 model — trusted by hospitals worldwide.
-        </div>
-        <div class="hero-stats">
-            <div class="stat-item"><span class="stat-num">236K</span><span class="stat-label">New Cases / Year</span></div>
-            <div class="stat-item"><span class="stat-num">80%</span><span class="stat-label">Survival if caught early</span></div>
-            <div class="stat-item"><span class="stat-num">#1</span><span class="stat-label">Cancer Killer in US</span></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        if st.button("🫁  Start My Lung Check"):
-            st.session_state.started = True
-            st.rerun()
-
-    st.markdown("""
-    <div class="footer">
-        This tool is for educational and screening awareness purposes only.<br>
-        It is not a medical diagnosis. Always consult a licensed physician.
-    </div>
-    """, unsafe_allow_html=True)
-    st.stop()
-
-# ─────────────────────────────────────────
-#  FORM
-# ─────────────────────────────────────────
-st.markdown("""
-<div class="hero-wrap" style="padding:32px 40px 28px;border-radius:0 0 24px 24px;">
-    <div class="hero-badge">ALCSI Innovation · Lung Health Tool</div>
-    <div class="hero-title" style="font-size:36px;margin-bottom:6px;">Your <em>LungIQ</em></div>
-    <div class="hero-sub" style="font-size:15px;margin-bottom:0;">Complete the fields below — takes about 30 seconds.</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Location ──
-st.markdown('<div class="section-label">📍 Location</div>', unsafe_allow_html=True)
-
-zip_input_val = st.session_state.get("zip_input", "")
-is_five_digits = len(zip_input_val) == 5 and zip_input_val.isdigit()
-detected_state = get_state_from_zip(zip_input_val) if is_five_digits else None
-is_in_indiana = zip_input_val in indiana_zips or detected_state == "IN"
-
-zip_css_class = "zip-valid" if is_five_digits else ""
-st.markdown(f'<div class="{zip_css_class}">', unsafe_allow_html=True)
-zip_code = st.text_input("ZIP Code", placeholder="e.g. 46032", key="zip_input", max_chars=5)
-st.markdown('</div>', unsafe_allow_html=True)
-
-if zip_code:
-    if is_five_digits and is_in_indiana:
-        st.markdown('<div class="zip-status ok">✓ Indiana ZIP recognized — nearby screening locations loaded</div>', unsafe_allow_html=True)
-    elif is_five_digits and detected_state:
-        st.markdown(f'<div class="zip-status ok">✓ {detected_state} ZIP recognized — screening center for your state loaded</div>', unsafe_allow_html=True)
-    elif is_five_digits:
-        st.markdown('<div class="zip-status warn">⚠ ZIP code not recognized — please double-check and re-enter</div>', unsafe_allow_html=True)
-
-# ── Urban/Rural ──
-st.markdown(info_tip("Where do you live?",
-    "Urban/rural setting affects lung cancer risk through differences in air quality, occupational exposures, access to healthcare, and smoking rates. This helps us understand screening gaps across different community types."), unsafe_allow_html=True)
-area_type = st.selectbox(
-    "Area type",
-    ["City (urban)", "Suburb", "Rural / small town"],
-    label_visibility="collapsed",
-    key="area_type"
-)
-
-# ── Demographics ──
-st.markdown('<div class="section-label">👤 About You</div>', unsafe_allow_html=True)
-col1, col2 = st.columns(2)
-with col1:
-    age = st.number_input("Age", min_value=10, max_value=100, value=55, step=1, format="%d")
-with col2:
-    race = st.selectbox("Race / Ethnicity", ["White","Black","Hispanic","Asian","Other"])
-
-education = st.selectbox(
-    "Highest education level",
-    ["Less than high school (0 yrs post-HS)",
-     "High school diploma (0 yrs post-HS)",
-     "Some college (2 yrs post-HS)",
-     "Bachelor's degree (4 yrs post-HS)",
-     "Graduate degree (6+ yrs post-HS)"]
-)
-edu_map = {
-    "Less than high school (0 yrs post-HS)": 0,
-    "High school diploma (0 yrs post-HS)": 0,
-    "Some college (2 yrs post-HS)": 2,
-    "Bachelor's degree (4 yrs post-HS)": 4,
-    "Graduate degree (6+ yrs post-HS)": 6,
-}
-education_val = edu_map[education]
-
-# ── Physical ──
-st.markdown('<div class="section-label">📏 Physical Stats</div>', unsafe_allow_html=True)
-col1, col2, col3 = st.columns(3)
-with col1:
-    height_ft = st.number_input("Height (ft)", 3, 8, 5)
-with col2:
-    height_in = st.number_input("Height (in)", 0, 11, 8)
-with col3:
-    weight = st.number_input("Weight (lbs)", 50, 600, 170)
-
-height_total_in = (height_ft * 12) + height_in
-bmi = (weight / (height_total_in ** 2)) * 703
-
-# ── Medical History ──
-st.markdown('<div class="section-label">🏥 Medical History</div>', unsafe_allow_html=True)
-
-st.markdown(info_tip("COPD (Chronic Obstructive Pulmonary Disease)",
-    "COPD is a chronic lung disease that makes it hard to breathe. It includes emphysema and chronic bronchitis. Smoking is the leading cause. People with COPD have a significantly higher lung cancer risk."), unsafe_allow_html=True)
-copd = 1 if st.selectbox("Do you have COPD?", ["No","Yes"], key="copd") == "Yes" else 0
-
-st.markdown(info_tip("Personal Cancer History",
-    "A prior diagnosis of any cancer (especially head, neck, or lung) can increase your risk due to shared genetic and lifestyle factors, as well as prior radiation exposure."), unsafe_allow_html=True)
-cancer_hist = 1 if st.selectbox("Have you had cancer before?", ["No","Yes"], key="cancer") == "Yes" else 0
-
-st.markdown(info_tip("Family History of Lung Cancer",
-    "Having a first-degree relative (parent, sibling, or child) diagnosed with lung cancer raises your risk. This likely reflects both shared genetics and shared environmental exposures."), unsafe_allow_html=True)
-family_hist = 1 if st.selectbox("Family history of lung cancer?", ["No","Yes"], key="family") == "Yes" else 0
-
-# ── Smoking ──
-st.markdown('<div class="section-label">🚬 Smoking History</div>', unsafe_allow_html=True)
-
-st.markdown(info_tip("Smoking Status",
-    "Smoking accounts for ~85% of all lung cancer cases. Even former smokers carry elevated risk for decades after quitting. 'Never smoker' means fewer than 100 cigarettes in your lifetime."), unsafe_allow_html=True)
-smoking = st.selectbox("Smoking status", ["Never","Former","Current"], key="smoke_status")
-smoking_status_val = 0 if smoking == "Never" else 1
-
-cigs, years, quit = 0, 0, 0
-pack_years = 0.0
-
-if smoking != "Never":
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(info_tip("Cigarettes per Day",
-            "Average number of cigarettes smoked per day during your smoking years. A pack = 20 cigarettes."), unsafe_allow_html=True)
-        cigs = st.number_input("Cigarettes per day (avg)", 1, 100, 20, key="cigs")
-    with col2:
-        st.markdown(info_tip("Years Smoked",
-            "Total number of years you smoked. Pack-years = (packs/day) × years smoked. ≥20 pack-years triggers USPSTF screening eligibility."), unsafe_allow_html=True)
-        years = st.number_input("Total years smoked", 1, 70, 20, key="years")
-
-    pack_years = (cigs / 20) * years
-
-    if smoking == "Former":
-        st.markdown(info_tip("Years Since Quitting",
-            "The longer since you quit, the lower your risk — though it never fully returns to a never-smoker's level. Risk drops most sharply in the first 5 years after quitting."), unsafe_allow_html=True)
-        quit = st.number_input("Years since quitting", 0, 60, 5, key="quit")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ── Submit ──
-# Only show the form and button if results haven't been calculated yet
-if "results" not in st.session_state:
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        run = st.button("🔬  Calculate My Lung Risk")
-
-    if st.session_state.calculating:
-        st.markdown("""
-        <div class="loading-box">
-            <span class="spinner">⏳</span>
-            Calculating your lung risk — please wait and do not press the button again…
-        </div>
-        """, unsafe_allow_html=True)
-        run = False
-
-    if run and not zip_code:
-        st.error("⚠️ Please enter your ZIP code before submitting.")
-        run = False
-    elif run and not is_five_digits:
-        st.error("⚠️ Please enter a valid 5-digit ZIP code.")
-        run = False
-
-    if run:
-        st.session_state.calculating = True
-        st.markdown("""
-        <div class="loading-box">
-            <span class="spinner">⏳</span>
-            Calculating your lung risk — please wait and do not press the button again…
-        </div>
-        """, unsafe_allow_html=True)
-
-        risk = extrapolate_risk(
-            age, race, education_val, bmi, copd, cancer_hist, family_hist,
-            smoking_status_val, cigs, years, quit
-        )
-        risk_pct = risk * 100
-        category, threshold = risk_category(risk_pct, age)
-        lung_age_val = lung_age_from_risk(age, risk_pct)
-        age_diff = lung_age_val - age
-        qualifies, qual_msg = uspstf_qualifies(age, smoking, pack_years)
-
-        st.session_state.results = {
-            "risk_pct": risk_pct, "category": category, "threshold": threshold,
-            "lung_age_val": lung_age_val, "age_diff": age_diff,
-            "qualifies": qualifies, "qual_msg": qual_msg,
-            "age": age, "smoking": smoking, "pack_years": pack_years,
-            "zip_code": zip_code, "race": race, "education_val": education_val,
-            "bmi": bmi, "copd": copd, "cancer_hist": cancer_hist,
-            "family_hist": family_hist, "cigs": cigs, "years": years,
-            "area_type": area_type,
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#ffffff">
+<title>LungIQ - National Equity & Access Tool</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        serif: ['"DM Serif Display"', 'serif'],
+      },
+      colors: {
+        brand: { light: '#eff6ff', DEFAULT: '#1d4ed8' },
+        accent: '#0ea5e9',
+        teal: '#0d9488',
+        danger: '#e11d48',
+        success: '#059669',
+        warning: '#d97706',
+      },
+      animation: {
+        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'shimmer': 'shimmer 4s infinite linear',
+        'spin-slow': 'spin 3s linear infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '-200% center' },
+          '100%': { backgroundPosition: '200% center' },
         }
+      }
+    }
+  }
+}
+</script>
+<style>
+body {
+  background-color: #f8f6f2;
+  color: #111827;
+  font-size: 18px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-font-smoothing: antialiased;
+  padding-top: 100px;
+}
+h1, h2, h3, h4, h5, h6, .font-serif { font-family: 'DM Serif Display', serif; }
+h2 { font-size: 2.5rem; letter-spacing: -0.02em; line-height: 1.1; }
+@media (min-width: 768px) { h2 { font-size: 3.5rem; } }
+p { line-height: 1.75; }
+label { font-weight: 600; }
+.section-label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+.shadow-primary { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); }
+.shadow-secondary { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.07); }
+.shadow-hover { box-shadow: 0 20px 40px -10px rgba(29, 78, 216, 0.12); }
+.interactive-card { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer;}
+.interactive-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -10px rgba(29, 78, 216, 0.12); }
+.dark-gradient-card {
+  background: linear-gradient(135deg, #06101f 0%, #0f2d6e 100%);
+  position: relative;
+}
+.dark-gradient-card::after {
+  content: ""; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none; border-radius: inherit;
+}
+nav {
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 2px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+.nav-link {
+  position: relative; padding: 0.5rem 0.5rem; font-weight: 800; font-size: 1rem;
+  color: #0f172a; transition: color 0.3s;
+}
+.nav-link::after {
+  content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 3px;
+  background-color: #1d4ed8; transition: width 0.3s ease; border-radius: 2px;
+}
+.nav-link:hover, .nav-link.active { color: #1d4ed8; }
+.nav-link.active::after { width: 100%; }
+.input-dark, .input-light { appearance: none; transition: all 0.3s ease; }
+.input-dark { background-color: #151f35; color: #f8fafc; border: 1px solid #334155; }
+.input-light { background-color: #ffffff; color: #111827; border: 1px solid #e5e7eb; }
+.input-dark:focus, .input-light:focus {
+  outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.35), 0 0 20px rgba(59,130,246,0.15);
+  border-color: #1d4ed8;
+}
+.select-wrapper { position: relative; }
+.select-wrapper::after {
+  content: '▼'; position: absolute; right: 1rem; top: 50%;
+  transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 0.8rem;
+}
+.form-section { border-left: 4px solid transparent; transition: background 0.3s; }
+.form-section:focus-within { border-left-color: #1d4ed8; background-color: #131b2f !important; }
+.barrier-card { border: 2px solid #334155; transition: all 0.2s; cursor: pointer; }
+.barrier-card:hover { transform: scale(1.02); border-color: #475569; }
+.barrier-card.selected { border-color: #1d4ed8; background-color: rgba(29, 78, 216, 0.1); }
+.barrier-card.selected .check-icon { opacity: 1; transform: scale(1); }
+.btn-shimmer {
+  background-size: 200% auto;
+  background-image: linear-gradient(to right, #1d4ed8 0%, #3b82f6 50%, #1d4ed8 100%);
+  animation: shimmer 4s infinite linear;
+}
+.view-section { display: none; opacity: 0; }
+.view-section.active { display: block; animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes slideUpFade {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.risk-high-bg { background: linear-gradient(45deg, #ffffff, #fff1f2); background-size: 200% 200%; }
+.stripes-bg { background-image: repeating-linear-gradient(45deg, rgba(225, 29, 72, 0.03) 0, rgba(225, 29, 72, 0.03) 10px, transparent 10px, transparent 20px); }
+.risk-low-bg { background: linear-gradient(45deg, #ffffff, #f0fdf4); background-size: 200% 200%; }
+.risk-mod-bg { background: linear-gradient(45deg, #ffffff, #fffbeb); background-size: 200% 200%; }
+.conic-border { position: relative; }
+.conic-border::before {
+  content: ''; position: absolute; inset: -3px; border-radius: inherit; z-index: -1;
+  background: conic-gradient(from 0deg, #1d4ed8, #0ea5e9, #0d9488, #1d4ed8);
+  animation: spin-slow 4s linear infinite;
+}
+.circular-chart { display: block; margin: 0 auto; max-width: 80%; max-height: 250px; }
+.circle-bg { fill: none; stroke: #e5e7eb; stroke-width: 3.8; }
+.circle { fill: none; stroke-width: 3.8; stroke-linecap: round; transition: stroke-dasharray 1.5s ease-out, stroke 1.5s; }
+/* Chat bubble styles */
+.chat-bubble-user {
+  background: #1d4ed8; color: white; border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
+}
+.chat-bubble-ai {
+  background: white; border: 1px solid #e5e7eb; border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
+  color: #1e293b;
+}
+</style>
+</head>
+<body class="flex flex-col relative min-h-screen">
 
-        log_usage({
-            "timestamp": datetime.datetime.now().isoformat(),
-            "user_id": st.session_state.device_id,
-            "zip": zip_code or "",
-            "state": get_state_from_zip(zip_code) or "",
-            "area_type": area_type,
-            "age": age,
-            "race": race,
-            "education": education,
-            "bmi": round(bmi, 1),
-            "smoking_status": smoking,
-            "pack_years": round(pack_years, 1),
-            "copd": copd,
-            "cancer_hist": cancer_hist,
-            "family_hist": family_hist,
-            "risk_pct": round(risk_pct, 3),
-            "risk_group": category,
-            "lung_age": lung_age_val,
-            "uspstf_eligible": qualifies,
-        })
-
-        st.session_state.calculating = False
-        st.rerun()
-
-# ─────────────────────────────────────────
-#  RESULTS
-# ─────────────────────────────────────────
-if "results" in st.session_state:
-    r = st.session_state.results
-    risk_pct      = r["risk_pct"]
-    category      = r["category"]
-    lung_age_val  = r["lung_age_val"]
-    age_diff      = r["age_diff"]
-    qualifies     = r["qualifies"]
-    qual_msg      = r["qual_msg"]
-    age           = r["age"]
-    smoking       = r["smoking"]
-    pack_years    = r["pack_years"]
-    zip_code      = r["zip_code"]
-    race          = r["race"]
-    education_val = r["education_val"]
-    bmi           = r["bmi"]
-    copd          = r["copd"]
-    cancer_hist   = r["cancer_hist"]
-    family_hist   = r["family_hist"]
-    cigs          = r["cigs"]
-    years         = r["years"]
-    area_type     = r["area_type"]
-
-    if age < 40:
-        st.markdown(f"""
-        <div class="age-warn">
-            ⚠️ <strong>Note for ages under 40:</strong> The PLCOm2012 model is clinically validated
-            for ages 40–80. Because you are {age}, your result uses an age-extrapolated estimate.
-            Lung cancer is rare under 40, but risk factors still matter for future health.
-            Interpret your result as informational only.
-        </div>
-        """, unsafe_allow_html=True)
-
-    diff_text = f"+{age_diff} years older than your actual age" if age_diff > 0 else (
-        f"{abs(age_diff)} years younger than your actual age" if age_diff < 0 else
-        "matching your actual age — you're on track"
-    )
-
-    st.markdown(f"""
-    <div class="result-panel {category}">
-        <div class="lung-age-label">Your LungIQ Lung Age</div>
-        <div class="lung-age-value {category}">{lung_age_val}</div>
-        <div class="lung-age-diff">{diff_text}</div>
-        <div class="risk-badge {category}">
-            {"⚠️ High Risk" if category=="high" else ("⚡ Moderate Risk" if category=="moderate" else "✅ Lower Risk")}
-        </div>
+<!-- Navigation -->
+<nav id="mainNav" class="fixed top-0 w-full z-50">
+  <div id="navProgress" class="absolute bottom-0 left-0 height-1 bg-gradient-to-r from-brand to-accent w-0 transition-all duration-200"></div>
+  <div class="max-w-[90rem] mx-auto px-4 sm:px-8 w-full py-4">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+      <div class="flex items-center cursor-pointer hover:opacity-80 transition-opacity" onclick="switchView('home')">
+        <i class="ph-fill ph-lungs text-brand text-4xl mr-3 animate-pulse-slow"></i>
+        <span class="font-serif italic font-bold text-3xl text-slate-900 tracking-tight">LungIQ</span>
+      </div>
+      <div class="flex flex-wrap justify-center items-center gap-x-6 gap-y-2">
+        <button onclick="switchView('home')" class="nav-link active">Home</button>
+        <button onclick="switchView('calculator')" class="nav-link">Assess Risk</button>
+        <button onclick="switchView('equity-data')" class="nav-link">National Data</button>
+        <button onclick="switchView('resources')" class="nav-link">Financial Navigator</button>
+        <button onclick="switchView('community')" class="nav-link">Community Action</button>
+        <button onclick="switchView('chatbot')" class="bg-slate-900 text-white hover:bg-slate-800 font-bold px-5 py-2.5 rounded-full transition-colors ml-2 shadow-md text-sm flex items-center border-2 border-slate-900">
+          <i class="ph-bold ph-brain mr-2 text-lg"></i> Ask LungCoach
+        </button>
+      </div>
     </div>
-    """, unsafe_allow_html=True)
+  </div>
+</nav>
 
-    # ── Screening Locations ──
-    nearby, detected_state, is_fallback = get_nearby_locations(zip_code) if zip_code and len(zip_code) == 5 else ([], None, None)
-    if nearby:
-        st.markdown('<div class="section-label">📍 Screening Centers Near You</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        if is_fallback:
-            st.markdown(f'<div class="card-title">Major lung cancer screening center in {detected_state}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="card-title">Facilities near your ZIP code that offer lung cancer screening</div>', unsafe_allow_html=True)
-        st.markdown('<div class="loc-grid">', unsafe_allow_html=True)
-        for loc in nearby:
-            st.markdown(f"""
-            <div class="loc-card">
-                <div class="loc-name">{loc['name']}</div>
-                <div class="loc-addr">📌 {loc['address']}</div>
-                <div class="loc-phone">📞 {loc['phone']}</div>
-                <div style="color:#8A94B0;font-size:11.5px;margin-top:5px;">{loc['note']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
+<main class="flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-[90rem] mx-auto w-full relative z-10">
 
-    # ── Smoking Cessation Simulator ──
-    if smoking != "Never":
-        st.markdown('<div class="section-label">💨 Smoking Cessation Simulator</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">What if you quit?</div>', unsafe_allow_html=True)
-        st.write("See how quitting smoking would change your lung age over time:")
-        years_quit_sim = st.slider("Years smoke-free (simulated)", 0, 25, 5)
-        sim_risk = extrapolate_risk(
-            age, race, education_val, bmi, copd, cancer_hist, family_hist,
-            1, cigs, years, years_quit_sim
-        )
-        sim_lung_age = lung_age_from_risk(age, sim_risk * 100)
-        gain = lung_age_val - sim_lung_age
-        st.markdown(f"""
-        <div class="sim-block">
-            <div style="text-align:center;font-size:13px;color:#6B7A99;margin-bottom:4px;">
-                Simulated Lung Age after <strong>{years_quit_sim} smoke-free years</strong>
-            </div>
-            <div class="sim-result">{sim_lung_age} <span style="font-size:18px;color:#1B7A48;">yrs</span></div>
-            <div style="text-align:center;font-size:13px;color:#1B7A48;font-weight:600;">
-                {"↓ " + str(gain) + " years younger than your current lung age" if gain > 0 else "Same as current — quit time already factored in"}
-            </div>
+<!-- ================= HOME ================= -->
+<section id="home" class="view-section active space-y-16">
+  <div class="max-w-6xl mx-auto dark-gradient-card rounded-[3rem] p-10 md:p-24 text-center text-white relative overflow-hidden shadow-2xl mt-4">
+    <div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-blue-500 rounded-full mix-blend-screen filter blur-[120px] opacity-40 animate-pulse-slow"></div>
+    <div class="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-teal-500 rounded-full mix-blend-screen filter blur-[120px] opacity-30 animate-pulse-slow" style="animation-delay:2s;"></div>
+    <div class="relative z-10">
+      <div class="inline-flex items-center px-5 py-2 rounded-full border border-blue-400/30 bg-white/10 backdrop-blur-md section-label text-blue-50 mb-12 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-green-400 mr-3 animate-ping"></span>National Equity Innovation
+      </div>
+      <h1 class="font-bold mb-8 font-serif drop-shadow-lg text-white" style="font-size: clamp(3.5rem, 8vw, 5.5rem); line-height: 1.1;">
+        Know your <br/><span class="italic font-serif text-blue-200">LungIQ</span>
+      </h1>
+      <p class="text-blue-50/90 mb-16 max-w-2xl mx-auto text-lg md:text-2xl font-medium leading-relaxed drop-shadow-md">
+        A science-backed, 30-second risk assessment using the clinically validated PLCOm2012 model. We connect you to free screenings, financial aid, and live environmental data nationwide.
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm transform transition hover:-translate-y-1">
+          <div class="text-5xl font-bold text-white mb-3 font-serif">80%</div>
+          <div class="section-label text-blue-200">Survival If Caught Early</div>
         </div>
-        """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── USPSTF Detail ──
-    st.markdown('<div class="section-label">📄 USPSTF Guideline Detail</div>', unsafe_allow_html=True)
-    qual_div = "qualify-yes" if qualifies else "qualify-no"
-    st.markdown(f"""
-    <div class="{qual_div}">
-        <strong>{"✅ You qualify" if qualifies else "ℹ️ You do not currently qualify"}</strong>
-        under USPSTF 2021 lung cancer screening guidelines.<br><br>
-        <strong>Full criteria:</strong> Age 50–80 · Current or former smoker · ≥20 pack-years<br>
-        <strong>Your stats:</strong> Age {age} · Status: {smoking} · Pack-years: {pack_years:.1f}<br><br>
-        {qual_msg}
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm transform transition hover:-translate-y-1">
+          <div class="text-5xl font-bold text-teal-300 mb-3 font-serif">100%</div>
+          <div class="section-label text-teal-100">Free on Medicaid/Medicare</div>
+        </div>
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm transform transition hover:-translate-y-1">
+          <div class="text-5xl font-bold text-white mb-3 font-serif">30s</div>
+          <div class="section-label text-blue-200">Time to Check Risk</div>
+        </div>
+      </div>
+      <button onclick="switchView('calculator')" class="btn-shimmer text-white shadow-hover px-14 py-6 rounded-full font-extrabold text-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center mx-auto">
+        🫁 <span class="ml-3">Start My Lung Check</span>
+      </button>
     </div>
-    """, unsafe_allow_html=True)
+  </div>
 
-# ── Footer ──
-st.markdown("""
-<div class="footer">
-    Based on the <strong>PLCOm2012</strong> lung cancer risk model (Tammemägi et al., 2013).<br>
-    USPSTF 2021 criteria applied per current clinical guidelines.<br>
-    This tool is for <em>educational and awareness purposes only</em> — not a medical diagnosis.<br>
-    Always consult a licensed physician for personal medical advice.<br><br>
-    Built for the ALCSI Lung Screening Innovation Competition · Indianapolis, IN<br>
-    <strong>LungIQ</strong> — Know your lungs. Protect your future.
-</div>
-""", unsafe_allow_html=True)
+  <div class="max-w-6xl mx-auto pt-8">
+    <h2 class="text-center font-serif text-4xl mb-12 text-slate-900">Explore the Platform</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div onclick="switchView('calculator')" class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col items-center text-center">
+        <div class="w-16 h-16 bg-blue-50 text-brand rounded-full flex items-center justify-center text-3xl mb-6"><i class="ph-bold ph-stethoscope"></i></div>
+        <h3 class="font-bold text-xl text-slate-900 mb-3">Assess Risk</h3>
+        <p class="text-slate-600 text-sm mb-6 flex-grow">PLCOm2012 clinical model — the gold standard used by hospitals worldwide.</p>
+        <span class="text-brand font-bold text-sm">Start Quiz <i class="ph-bold ph-arrow-right ml-1"></i></span>
+      </div>
+      <div onclick="switchView('equity-data')" class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col items-center text-center">
+        <div class="w-16 h-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-3xl mb-6"><i class="ph-bold ph-chart-bar"></i></div>
+        <h3 class="font-bold text-xl text-slate-900 mb-3">Equity Data</h3>
+        <p class="text-slate-600 text-sm mb-6 flex-grow">Live environmental and demographic data from US Census, EPA, and CDC.</p>
+        <span class="text-purple-600 font-bold text-sm">View Data <i class="ph-bold ph-arrow-right ml-1"></i></span>
+      </div>
+      <div onclick="switchView('resources')" class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col items-center text-center">
+        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-6"><i class="ph-bold ph-wallet"></i></div>
+        <h3 class="font-bold text-xl text-slate-900 mb-3">Financial Access</h3>
+        <p class="text-slate-600 text-sm mb-6 flex-grow">Calculate exact scan costs, lost wages, and find free clinics.</p>
+        <span class="text-emerald-600 font-bold text-sm">Get Help <i class="ph-bold ph-arrow-right ml-1"></i></span>
+      </div>
+      <div onclick="switchView('community')" class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col items-center text-center">
+        <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center text-3xl mb-6"><i class="ph-bold ph-users"></i></div>
+        <h3 class="font-bold text-xl text-slate-900 mb-3">Community Action</h3>
+        <p class="text-slate-600 text-sm mb-6 flex-grow">Download toolkits for your barbershop, church, or neighborhood.</p>
+        <span class="text-amber-600 font-bold text-sm">Take Action <i class="ph-bold ph-arrow-right ml-1"></i></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-5xl mx-auto bg-white rounded-3xl p-10 border border-gray-200 text-center shadow-sm mt-12">
+    <div class="section-label text-gray-400 mb-8">Pulling live data directly from:</div>
+    <div class="flex flex-wrap justify-center items-center gap-10 md:gap-20 opacity-60">
+      <div class="font-sans font-bold text-2xl text-slate-800 tracking-tight">US Census Bureau</div>
+      <div class="font-sans font-extrabold text-2xl text-blue-800 tracking-tighter">CDC PLACES</div>
+      <div class="font-sans font-bold text-2xl text-emerald-800">EPA Air Quality</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CALCULATOR ================= -->
+<section id="calculator" class="view-section">
+  <div class="max-w-3xl mx-auto">
+    <div class="dark-gradient-card rounded-t-[3rem] p-14 text-center text-white mb-0 shadow-2xl relative">
+      <h2 class="text-4xl md:text-5xl font-serif font-bold mb-6">Your <span class="italic font-serif text-blue-300">LungIQ</span></h2>
+      <div class="flex justify-center items-center space-x-2 md:space-x-4 max-w-md mx-auto mt-8">
+        <div class="step-dot w-4 h-4 rounded-full bg-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.8)]" id="step1"></div>
+        <div class="w-8 md:w-16 h-0.5 bg-white/30"></div>
+        <div class="step-dot w-4 h-4 rounded-full bg-white/20 transition-all" id="step2"></div>
+        <div class="w-8 md:w-16 h-0.5 bg-white/30"></div>
+        <div class="step-dot w-4 h-4 rounded-full bg-white/20 transition-all" id="step3"></div>
+        <div class="w-8 md:w-16 h-0.5 bg-white/30"></div>
+        <div class="step-dot w-4 h-4 rounded-full bg-white/20 transition-all" id="step4"></div>
+      </div>
+      <div class="text-xs uppercase tracking-widest text-blue-200 mt-6 font-bold" id="formProgressText">Step 1: Location</div>
+      <div class="absolute top-8 right-8 text-xs font-bold text-blue-200 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm" id="fieldsComplete">0 of 6 fields complete</div>
+    </div>
+
+    <div class="bg-[#0f172a] rounded-b-[3rem] p-10 md:p-16 shadow-2xl text-slate-300 border-t-4 border-brand relative z-10">
+      <form id="lungRiskForm" onsubmit="calculateRisk(event)">
+
+        <!-- STEP 1: Location -->
+        <div class="mb-12 form-section p-8 rounded-2xl bg-[#0f172a]" id="section-location">
+          <h3 class="section-label text-pink-400 mb-8 flex items-center"><i class="ph-fill ph-map-pin mr-3 text-2xl"></i> Location & Access</h3>
+          <div class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+              <div>
+                <label class="block text-lg mb-3 text-slate-300">US ZIP Code <span class="text-slate-500 font-normal text-sm ml-2">(Used to fetch nearby clinics)</span></label>
+                <div class="relative">
+                  <input type="text" id="zipCode" required minlength="5" maxlength="5" placeholder="e.g. 46032" class="w-full input-dark rounded-xl p-5 text-xl font-bold tracking-widest form-input-track" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,5); validateZip()">
+                  <i id="zipValidIcon" class="ph-fill ph-check-circle absolute right-5 top-1/2 transform -translate-y-1/2 text-3xl text-slate-600 transition-colors duration-300"></i>
+                </div>
+              </div>
+              <div>
+                <label class="block text-lg mb-3 text-slate-300">Area Type</label>
+                <div class="select-wrapper">
+                  <select id="areaType" required class="w-full input-dark rounded-xl p-5 text-lg font-bold form-input-track">
+                    <option value="" disabled selected>Select area type...</option>
+                    <option value="City (urban)">City (Urban)</option>
+                    <option value="Suburb">Suburb</option>
+                    <option value="Rural">Rural</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="block text-lg mb-3 text-slate-300">Insurance Status</label>
+              <div class="select-wrapper">
+                <select id="insurance" required class="w-full input-dark rounded-xl p-5 text-lg font-bold form-input-track" onchange="checkInsuranceBanner()">
+                  <option value="" disabled selected>Select coverage...</option>
+                  <option value="uninsured">Uninsured / No Coverage</option>
+                  <option value="medicaid">Medicaid</option>
+                  <option value="medicare">Medicare</option>
+                  <option value="private">Private / Employer Insurance</option>
+                </select>
+              </div>
+              <div id="uninsuredBanner" class="hidden overflow-hidden transition-all duration-400 ease-out max-h-0 opacity-0 mt-4">
+                <div class="bg-green-900/40 border border-green-500/50 rounded-xl p-5 flex items-center">
+                  <i class="ph-fill ph-check-circle text-green-400 text-3xl mr-4"></i>
+                  <span class="text-green-100 font-bold text-lg">Don't worry — we'll find you free options.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: About You -->
+        <div class="mb-12 form-section p-8 rounded-2xl bg-[#151f35]" id="section-about">
+          <h3 class="section-label text-slate-400 mb-8 flex items-center"><i class="ph-fill ph-user mr-3 text-2xl"></i> About You</h3>
+          <div class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <label class="block text-lg mb-3 text-slate-300">Age</label>
+                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track">
+              </div>
+              <div>
+                <label class="block text-lg mb-3 text-slate-300">Race / Ethnicity <span class="text-slate-500 font-normal text-sm ml-1">(Optional)</span></label>
+                <div class="select-wrapper">
+                  <select class="w-full input-dark rounded-xl p-5 text-lg font-bold form-input-track" id="raceInput">
+                    <option value="White">Prefer not to answer</option>
+                    <option value="Black">Black</option>
+                    <option value="Hispanic">Hispanic/Latino</option>
+                    <option value="White">White</option>
+                    <option value="Asian">Asian</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="block text-lg mb-3 text-slate-300">Highest Education Level</label>
+              <div class="select-wrapper">
+                <select id="education" class="w-full input-dark rounded-xl p-5 text-lg font-bold form-input-track">
+                  <option value="0">Less than high school</option>
+                  <option value="0">High school diploma / GED</option>
+                  <option value="2" selected>Some college</option>
+                  <option value="4">Bachelor's degree</option>
+                  <option value="6">Graduate / professional degree</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-lg mb-3 text-slate-300">Height & Weight <span class="text-slate-500 font-normal text-sm ml-2">(Used to calculate BMI)</span></label>
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-2 uppercase tracking-widest">Feet</label>
+                  <input type="number" id="heightFt" min="3" max="8" value="5" class="w-full input-dark rounded-xl p-4 text-xl font-bold text-center">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-2 uppercase tracking-widest">Inches</label>
+                  <input type="number" id="heightIn" min="0" max="11" value="8" class="w-full input-dark rounded-xl p-4 text-xl font-bold text-center">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-2 uppercase tracking-widest">Weight (lbs)</label>
+                  <input type="number" id="weightLbs" min="50" max="600" value="170" class="w-full input-dark rounded-xl p-4 text-xl font-bold text-center">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Medical & Smoking -->
+        <div class="mb-12 form-section p-8 rounded-2xl bg-[#0f172a]" id="section-medical">
+          <h3 class="section-label text-slate-400 mb-8 flex items-center"><i class="ph-fill ph-stethoscope mr-3 text-2xl"></i> Medical History & Smoking</h3>
+          <div class="space-y-8">
+            <!-- Medical history cards -->
+            <div class="bg-slate-800/40 p-6 rounded-2xl border border-slate-700">
+              <label class="block text-base text-slate-400 mb-4 uppercase tracking-widest text-xs font-bold">Medical History</label>
+              <div class="grid grid-cols-3 gap-6 items-end">
+                <div>
+                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem]">COPD?</label>
+                  <div class="select-wrapper">
+                    <select id="copd" class="w-full input-dark rounded-xl p-4 text-base font-bold">
+                      <option value="0">No</option>
+                      <option value="1">Yes</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem]">Prior Cancer?</label>
+                  <div class="select-wrapper">
+                    <select id="cancerHist" class="w-full input-dark rounded-xl p-4 text-base font-bold">
+                      <option value="0">No</option>
+                      <option value="1">Yes</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem]">Family Lung Cancer?</label>
+                  <div class="select-wrapper">
+                    <select id="familyHist" class="w-full input-dark rounded-xl p-4 text-base font-bold">
+                      <option value="0">No</option>
+                      <option value="1">Yes</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Smoking -->
+            <div>
+              <label class="block text-lg mb-3 text-slate-300">Smoking Status</label>
+              <div class="select-wrapper">
+                <select id="smokingStatus" required class="w-full input-dark rounded-xl p-5 text-lg font-bold form-input-track" onchange="toggleSmokingDetails()">
+                  <option value="" disabled selected>Select status...</option>
+                  <option value="current">Current Smoker</option>
+                  <option value="former">Former Smoker (Quit)</option>
+                  <option value="never">Never Smoked</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="smokingDetails" class="overflow-hidden transition-all duration-400 ease-in-out max-h-0 opacity-0">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-800/40 p-6 rounded-2xl border border-slate-700 mt-2">
+                <div>
+                  <label class="block text-base mb-2 text-slate-300">Cigarettes/Day</label>
+                  <input type="number" id="cigsPerDay" min="1" max="100" value="20" placeholder="e.g. 20" class="w-full input-dark rounded-xl p-4 text-xl font-bold form-input-track">
+                </div>
+                <div>
+                  <label class="block text-base mb-2 text-slate-300">Years Smoked</label>
+                  <input type="number" id="yearsSmoked" min="0" max="70" placeholder="e.g. 20" class="w-full input-dark rounded-xl p-4 text-xl font-bold form-input-track">
+                </div>
+                <div id="yearsQuitContainer" class="hidden">
+                  <label class="block text-base mb-2 text-slate-300">Years Since Quitting</label>
+                  <input type="number" id="yearsQuit" min="0" max="60" placeholder="e.g. 5" class="w-full input-dark rounded-xl p-4 text-xl font-bold form-input-track">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4: Barriers -->
+        <div class="mb-12 form-section p-8 rounded-2xl bg-[#151f35]" id="section-action">
+          <label class="block text-2xl mb-6 text-white font-serif"><i class="ph-bold ph-question mr-2 text-brand-light"></i> What is your biggest barrier to seeing a doctor right now?</label>
+          <input type="hidden" id="barrierHidden" required class="form-input-track" value="">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="barrier-card rounded-2xl p-6 flex items-start relative" onclick="selectBarrier(this, 'cost')">
+              <i class="ph-fill ph-money text-4xl text-emerald-400 mr-5"></i>
+              <div><h4 class="font-bold text-white text-lg mb-1">Cost</h4><p class="text-sm text-slate-400 leading-relaxed">Worried about the hospital bill</p></div>
+              <i class="ph-bold ph-check-circle absolute top-5 right-5 text-brand opacity-0 check-icon transition-all text-2xl"></i>
+            </div>
+            <div class="barrier-card rounded-2xl p-6 flex items-start relative" onclick="selectBarrier(this, 'transportation')">
+              <i class="ph-fill ph-car text-4xl text-amber-400 mr-5"></i>
+              <div><h4 class="font-bold text-white text-lg mb-1">Transportation</h4><p class="text-sm text-slate-400 leading-relaxed">Don't have a reliable ride</p></div>
+              <i class="ph-bold ph-check-circle absolute top-5 right-5 text-brand opacity-0 check-icon transition-all text-2xl"></i>
+            </div>
+            <div class="barrier-card rounded-2xl p-6 flex items-start relative" onclick="selectBarrier(this, 'fear')">
+              <i class="ph-fill ph-heartbreak text-4xl text-rose-400 mr-5"></i>
+              <div><h4 class="font-bold text-white text-lg mb-1">Fear</h4><p class="text-sm text-slate-400 leading-relaxed">Afraid of what they might find</p></div>
+              <i class="ph-bold ph-check-circle absolute top-5 right-5 text-brand opacity-0 check-icon transition-all text-2xl"></i>
+            </div>
+            <div class="barrier-card rounded-2xl p-6 flex items-start relative" onclick="selectBarrier(this, 'time')">
+              <i class="ph-fill ph-clock text-4xl text-purple-400 mr-5"></i>
+              <div><h4 class="font-bold text-white text-lg mb-1">Time</h4><p class="text-sm text-slate-400 leading-relaxed">Can't take time off work</p></div>
+              <i class="ph-bold ph-check-circle absolute top-5 right-5 text-brand opacity-0 check-icon transition-all text-2xl"></i>
+            </div>
+            <div class="barrier-card md:col-span-2 rounded-2xl p-6 flex items-center justify-center relative bg-slate-800/30" onclick="selectBarrier(this, 'none')">
+              <h4 class="font-bold text-slate-300 text-lg">✅ I don't have any major barriers</h4>
+              <i class="ph-bold ph-check-circle absolute top-1/2 -translate-y-1/2 right-6 text-brand opacity-0 check-icon transition-all text-2xl"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center pt-8 border-t border-slate-700/50">
+          <button type="submit" id="submitBtn" class="btn-shimmer text-white w-full px-10 py-6 rounded-[2rem] font-extrabold text-2xl transition-all transform hover:-translate-y-1 hover:shadow-hover flex items-center justify-center">
+            <i class="ph-bold ph-stethoscope mr-4 text-3xl" id="submitIcon"></i>
+            <span id="submitText">Calculate My Lung Risk</span>
+          </button>
+          <p class="text-sm text-slate-400 mt-8 flex items-center justify-center">
+            <i class="ph-fill ph-shield-check mr-2"></i> All data collected is completely anonymous. Never stored or sold.
+          </p>
+        </div>
+      </form>
+    </div>
+
+    <div class="max-w-3xl mx-auto text-center pt-10 border-t border-gray-200 mt-12">
+      <button onclick="switchView('equity-data')" class="bg-slate-900 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        Skip Quiz: View National Data <i class="ph-bold ph-arrow-right ml-3 text-2xl"></i>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section id="results" class="view-section">
+  <div class="max-w-5xl mx-auto space-y-10">
+
+    <!-- Risk header -->
+    <div id="resultHeader" class="bg-white rounded-[3rem] p-10 md:p-16 shadow-secondary border-l-[8px] flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
+      <div id="resultIcon" class="w-32 h-32 rounded-full flex items-center justify-center text-7xl shrink-0 z-10 relative"></div>
+      <div class="z-10 relative flex-grow">
+        <h2 id="resultTitle" class="text-4xl md:text-5xl font-bold text-slate-900 mb-4">Analyzing...</h2>
+        <p id="resultDesc" class="text-slate-600 text-xl leading-relaxed"></p>
+        <!-- PLCOm2012 stats bar -->
+        <div id="plcoStatsBar" class="hidden mt-6 grid grid-cols-3 gap-4">
+          <div class="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+            <div class="section-label text-slate-400 mb-1">6-Year Risk</div>
+            <div id="plcoRiskPct" class="text-3xl font-bold font-serif text-slate-900">—</div>
+          </div>
+          <div class="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+            <div class="section-label text-slate-400 mb-1">Lung Age</div>
+            <div id="plcoLungAge" class="text-3xl font-bold font-serif text-slate-900">—</div>
+          </div>
+          <div class="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+            <div class="section-label text-slate-400 mb-1">Pack-Years</div>
+            <div id="plcoPackYears" class="text-3xl font-bold font-serif text-slate-900">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USPSTF eligibility banner -->
+    <div id="uspstfBanner" class="hidden bg-blue-50 border-2 border-blue-200 rounded-[2rem] p-8">
+      <div class="flex items-start gap-5">
+        <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+          <i class="ph-bold ph-clipboard-text text-white text-xl"></i>
+        </div>
+        <div>
+          <h4 id="uspstfTitle" class="font-bold text-slate-900 text-xl mb-2">USPSTF Screening Eligibility</h4>
+          <p id="uspstfMsg" class="text-slate-700 text-base leading-relaxed"></p>
+          <p class="text-slate-500 text-sm mt-3"><strong>USPSTF 2021 criteria:</strong> Age 50–80 · Current or former smoker · ≥20 pack-years</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action plan -->
+    <div id="actionPlanContainer" class="hidden conic-border rounded-[3rem] p-[4px]">
+      <div class="bg-white rounded-[calc(3rem-4px)] p-10 md:p-14 w-full h-full relative z-10">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-10 pb-8 border-b border-gray-200">
+          <div class="flex items-center">
+            <i class="ph-fill ph-clipboard-text text-brand text-5xl mr-5"></i>
+            <h3 class="text-3xl md:text-4xl font-serif text-slate-900 font-bold">Your Personal Action Plan</h3>
+          </div>
+          <span class="mt-4 md:mt-0 text-sm font-bold bg-blue-50 text-brand px-4 py-2 rounded-full">Tailored to your barriers</span>
+        </div>
+        <div id="actionPlanList" class="space-y-6"></div>
+        <div id="actionPlanSuccess" class="hidden mt-10 bg-green-50 rounded-2xl p-8 border border-green-200 text-center">
+          <div class="w-16 h-16 bg-green-500 text-white rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-lg"><i class="ph-bold ph-check"></i></div>
+          <h4 class="text-2xl font-bold text-green-900 mb-2">🎉 You've completed your plan!</h4>
+          <p class="text-green-800 mb-6 text-lg">Taking these steps drastically improves your outcomes.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulator -->
+    <div id="simulatorCard" class="hidden bg-white rounded-[2rem] p-10 shadow-primary border border-gray-200">
+      <h3 class="text-3xl font-serif text-slate-900 font-bold mb-8 flex items-center">
+        <i class="ph-fill ph-sliders-horizontal text-accent mr-4 text-4xl"></i> What If I Changed?
+      </h3>
+      <div class="flex flex-col md:flex-row gap-6 items-center">
+        <div class="bg-slate-50 rounded-2xl p-6 border border-gray-200 w-full flex justify-between items-center hover:border-brand transition-colors">
+          <span class="font-bold text-slate-800 text-lg">What if I quit smoking today?</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="simQuit" class="sr-only peer" onchange="updateSimulator()">
+            <div class="w-14 h-8 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand shadow-inner"></div>
+          </label>
+        </div>
+        <div class="bg-slate-50 rounded-2xl p-6 border border-gray-200 w-full flex justify-between items-center hover:border-teal-500 transition-colors">
+          <span class="font-bold text-slate-800 text-lg">What if I got screened?</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="simScreen" class="sr-only peer" onchange="updateSimulator()">
+            <div class="w-14 h-8 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-teal-600 shadow-inner"></div>
+          </label>
+        </div>
+      </div>
+      <div class="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
+        <p id="simResult" class="text-brand font-bold text-center text-xl">Toggle options above to see how your future changes.</p>
+      </div>
+    </div>
+
+    <!-- Risk breakdown + SMS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="md:col-span-2 bg-white border border-gray-200 rounded-[2rem] p-10 shadow-primary">
+        <h3 class="text-2xl font-serif text-slate-900 font-bold mb-8">Your Risk Factors Breakdown</h3>
+        <div id="riskBreakdownList" class="space-y-6"></div>
+      </div>
+      <div class="bg-gradient-to-b from-[#0f172a] to-[#1e3a8a] rounded-[2rem] p-10 shadow-secondary text-white flex flex-col justify-between interactive-card relative overflow-hidden">
+        <div class="absolute top-[-50px] right-[-50px] w-40 h-40 bg-brand rounded-full mix-blend-screen filter blur-[50px] opacity-50"></div>
+        <div class="relative z-10">
+          <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-blue-300 text-3xl mb-8"><i class="ph-fill ph-bell-ringing"></i></div>
+          <h3 class="text-3xl font-serif font-bold mb-4">Annual Check-In</h3>
+          <p class="text-blue-100/90 text-base mb-8 leading-relaxed">Your risk changes. Enter your number to get one automated text next year to retake this.</p>
+          <input type="tel" id="smsInput" placeholder="(555) 555-0123" class="w-full bg-black/40 border border-white/20 rounded-xl p-5 text-white mb-6 text-lg focus:border-blue-400 focus:outline-none transition-all placeholder-white/30 font-bold tracking-wider" oninput="formatPhone(this)">
+        </div>
+        <button id="smsBtn" onclick="submitSMS()" class="w-full text-center bg-white text-brand font-extrabold py-5 rounded-xl hover:bg-blue-50 transition-all shadow-lg text-xl relative z-10">Opt-in to SMS</button>
+      </div>
+    </div>
+
+    <!-- Screening centers -->
+    <div class="bg-white rounded-[3rem] p-10 shadow-primary border border-gray-200">
+      <h3 class="text-2xl font-serif text-slate-900 font-bold mb-8 flex items-center">
+        <i class="ph-fill ph-hospital text-brand mr-3"></i> Screening Centers Near <span id="nearestZip" class="ml-2">You</span>
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="border border-gray-200 rounded-xl p-6 bg-slate-50 hover:border-brand transition-colors">
+          <div class="section-label text-brand mb-2 inline-block">Primary Health Campus</div>
+          <p class="font-bold text-slate-900 text-lg mb-1" id="clinicCity1">Local Hospital</p>
+          <p class="text-sm text-slate-500 mb-4">Main Outpatient Center</p>
+          <span class="text-xs font-bold px-3 py-1 rounded bg-teal-100 text-teal-800 mb-4 inline-block">Coverage Confirmed</span>
+          <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" class="block w-full text-center border-2 border-brand text-brand font-bold py-2 rounded-lg hover:bg-brand hover:text-white transition-colors">Get Directions</a>
+        </div>
+        <div class="border border-gray-200 rounded-xl p-6 bg-slate-50 hover:border-brand transition-colors">
+          <div class="section-label text-brand mb-2 inline-block">Community Health</div>
+          <p class="font-bold text-slate-900 text-lg mb-1" id="clinicCity2">Regional Care Center</p>
+          <p class="text-sm text-slate-500 mb-4">Outpatient Diagnostic Hub</p>
+          <span class="text-xs font-bold px-3 py-1 rounded bg-teal-100 text-teal-800 mb-4 inline-block">Coverage Confirmed</span>
+          <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" class="block w-full text-center border-2 border-brand text-brand font-bold py-2 rounded-lg hover:bg-brand hover:text-white transition-colors">Get Directions</a>
+        </div>
+        <div class="border border-gray-200 rounded-xl p-6 bg-slate-50 hover:border-brand transition-colors">
+          <div class="section-label text-brand mb-2 inline-block">FQHC Partner</div>
+          <p class="font-bold text-slate-900 text-lg mb-1" id="clinicCity3">Free Clinic Network</p>
+          <p class="text-sm text-slate-500 mb-4">Federally Qualified Clinic</p>
+          <span class="text-xs font-bold px-3 py-1 rounded bg-teal-100 text-teal-800 mb-4 inline-block">Coverage Confirmed</span>
+          <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" class="block w-full text-center border-2 border-brand text-brand font-bold py-2 rounded-lg hover:bg-brand hover:text-white transition-colors">Get Directions</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto text-center pt-10 border-t border-gray-200 mt-12">
+      <button onclick="switchView('equity-data')" class="bg-slate-900 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        Next: View National Equity Data <i class="ph-bold ph-arrow-right ml-3 text-2xl"></i>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EQUITY DATA DASHBOARD ================= -->
+<section id="equity-data" class="view-section">
+  <div class="max-w-6xl mx-auto">
+    <div class="mb-16 text-center">
+      <span class="inline-block px-5 py-2 bg-purple-100 text-purple-800 rounded-full section-label mb-6 shadow-sm">National Community Data</span>
+      <h2 class="text-slate-900 mb-6">Zip Code Health Equity Report</h2>
+      <p class="text-slate-600 text-xl max-w-3xl mx-auto leading-relaxed">Where you live shouldn't determine if you survive. We pull live data from the US Census, EPA, and CDC to analyze structural disparities.</p>
+    </div>
+
+    <div class="bg-white p-8 md:p-10 rounded-[3rem] shadow-secondary border border-gray-200 mb-12 flex flex-col sm:flex-row items-center gap-8 max-w-4xl mx-auto interactive-card">
+      <div class="w-full">
+        <label class="block text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Enter US Zip Code</label>
+        <input type="text" id="equityZipInput" placeholder="e.g. 46032" class="w-full input-light rounded-2xl p-5 text-2xl font-bold tracking-widest" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,5);">
+      </div>
+      <button onclick="generateEquityReport()" class="bg-slate-900 text-white px-12 py-5 rounded-2xl font-extrabold text-xl w-full sm:w-auto mt-6 sm:mt-0 whitespace-nowrap hover:bg-slate-800 hover:shadow-xl transition-all transform hover:-translate-y-1">
+        Fetch Live Data
+      </button>
+    </div>
+
+    <div id="equityError" class="hidden bg-rose-50 border border-rose-200 rounded-[2rem] p-10 text-center text-rose-800 mb-12 shadow-sm">
+      <i class="ph-fill ph-warning-circle text-6xl mb-4 text-rose-500"></i>
+      <h3 class="font-bold text-3xl font-serif text-rose-900 mb-3">Zip Code Not Found</h3>
+      <p class="text-lg">We couldn't reach the public APIs for that zip code. Please ensure it's a valid 5-digit US zip code.</p>
+    </div>
+
+    <div id="equitySkeleton" class="hidden grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="md:col-span-3 h-48 bg-slate-200 rounded-[3rem] animate-pulse"></div>
+      <div class="h-56 bg-slate-200 rounded-[2rem] animate-pulse"></div>
+      <div class="h-56 bg-slate-200 rounded-[2rem] animate-pulse"></div>
+      <div class="h-56 bg-slate-200 rounded-[2rem] animate-pulse"></div>
+    </div>
+
+    <div id="equityDashboardOutput" class="hidden space-y-10">
+      <!-- Header card -->
+      <div class="bg-slate-900 text-white p-10 md:p-14 rounded-[3rem] flex flex-col md:flex-row justify-between items-center shadow-hover">
+        <div class="mb-10 md:mb-0 text-center md:text-left flex-1">
+          <h3 class="text-5xl font-serif font-bold mb-4" id="eqZipDisplay">Zip Code: —</h3>
+          <p class="text-blue-200 text-2xl font-medium mb-6" id="eqNeighborhoodDisplay">—</p>
+          <p class="text-slate-300 max-w-xl leading-relaxed text-lg bg-white/5 p-6 rounded-2xl border border-white/10" id="eqNarrative"></p>
+        </div>
+        <div class="relative w-56 h-56 flex items-center justify-center bg-slate-800 rounded-[2rem] border border-slate-700 p-4 shadow-inner flex-shrink-0 md:ml-10">
+          <svg viewBox="0 0 36 36" class="circular-chart absolute inset-0 w-full h-full p-3">
+            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path class="circle" id="eqScoreCircle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" stroke="#fbbf24" />
+          </svg>
+          <div class="text-center z-10">
+            <div class="section-label text-slate-400 mb-2">Equity Score</div>
+            <div class="text-6xl font-bold font-serif drop-shadow-md" id="eqScoreDisplay">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data cards — 5 real metrics (distance removed) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-slate-900 text-xl">Poverty Rate</h4>
+              <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-chart-polar text-slate-500 text-2xl" id="iconPoverty"></i></div>
+            </div>
+            <div class="text-5xl font-serif font-bold mb-4 text-slate-900" id="eqPoverty">—</div>
+            <p class="text-base text-slate-500 leading-relaxed">% of residents below poverty level (US Census ACS 5-year).</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-slate-900 text-xl">Air Quality</h4>
+              <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-factory text-slate-500 text-2xl" id="iconAQI"></i></div>
+            </div>
+            <div class="text-5xl font-serif font-bold mb-4 text-slate-900" id="eqAQI">—</div>
+            <p class="text-base text-slate-500 leading-relaxed">Live US AQI based on zip code coordinates (Open-Meteo).</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-slate-900 text-xl">Median Income</h4>
+              <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-money text-slate-500 text-2xl" id="iconIncome"></i></div>
+            </div>
+            <div class="text-5xl font-serif font-bold mb-4 text-slate-900" id="eqIncome">—</div>
+            <p class="text-base text-slate-500 leading-relaxed">Household median income estimate (US Census).</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-slate-900 text-xl">Uninsured Rate</h4>
+              <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-shield-slash text-slate-500 text-2xl" id="iconUninsured"></i></div>
+            </div>
+            <div class="text-5xl font-serif font-bold mb-4 text-slate-900" id="eqUninsured">—</div>
+            <p class="text-base text-slate-500 leading-relaxed">% of residents without health coverage (US Census).</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-[2rem] shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-slate-900 text-xl">Smoking Rate</h4>
+              <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-cigarette text-slate-500 text-2xl" id="iconSmoking"></i></div>
+            </div>
+            <div class="text-5xl font-serif font-bold mb-4 text-slate-900" id="eqSmoking">—</div>
+            <p class="text-base text-slate-500 leading-relaxed">Estimated adult smoking rate (CDC PLACES API).</p>
+          </div>
+        </div>
+
+        <!-- Find screening center card -->
+        <div class="bg-brand p-8 rounded-[2rem] shadow-primary interactive-card flex flex-col justify-between cursor-pointer" onclick="switchView('calculator')">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-bold text-white text-xl">Find Screening Centers</h4>
+              <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center"><i class="ph-fill ph-hospital text-white text-2xl"></i></div>
+            </div>
+            <p class="text-blue-100 text-base leading-relaxed mb-6">Use our Risk Calculator to locate certified low-dose CT screening facilities near your zip code.</p>
+          </div>
+          <div class="bg-white text-brand font-bold py-3 px-6 rounded-xl text-center text-sm">
+            Find Centers Near Me →
+          </div>
+        </div>
+      </div>
+
+      <!-- Disparity comparison bars -->
+      <div class="bg-white rounded-[3rem] p-12 shadow-secondary border border-gray-200 mt-10">
+        <div class="flex items-center mb-10">
+          <i class="ph-fill ph-chart-line-up text-brand text-4xl mr-4"></i>
+          <h3 class="text-3xl font-serif text-slate-900 font-bold">Disparity Comparison</h3>
+        </div>
+        <div class="space-y-10">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <div class="flex items-center gap-3">
+                <span class="text-slate-700 font-bold text-lg">Uninsured Rate</span>
+                <span class="text-xs font-bold text-brand bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest border border-blue-200">Your Zip Code</span>
+              </div>
+              <span id="barValUnins" class="text-2xl font-bold">—</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-6 mb-3 overflow-hidden shadow-inner">
+              <div id="barZipUnins" class="bg-brand h-6 transition-all duration-1000" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-end text-sm text-slate-500">
+              <span class="font-bold text-slate-800 flex items-center"><span class="w-3 h-3 rounded-full bg-slate-300 mr-2"></span>National Avg: 8.6%</span>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <div class="flex items-center gap-3">
+                <span class="text-slate-700 font-bold text-lg">Smoking Rate</span>
+                <span class="text-xs font-bold text-brand bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest border border-blue-200">Your Zip Code</span>
+              </div>
+              <span id="barValSmoke" class="text-2xl font-bold">—</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-6 mb-3 overflow-hidden shadow-inner">
+              <div id="barZipSmoke" class="bg-brand h-6 transition-all duration-1000" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-end text-sm text-slate-500">
+              <span class="font-bold text-slate-800 flex items-center"><span class="w-3 h-3 rounded-full bg-slate-300 mr-2"></span>National Avg: 11.5%</span>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-8 text-center"><i class="ph-fill ph-shield-check mr-1"></i> All data is anonymous. Sourced directly from US Census Bureau, EPA Air Quality, and CDC PLACES APIs.</p>
+      </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto text-center pt-12 mt-12 border-t border-gray-200">
+      <button onclick="switchView('resources')" class="bg-slate-900 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        Next: Financial Navigation <i class="ph-bold ph-arrow-right ml-3 text-2xl"></i>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINANCIAL & ACCESS ================= -->
+<section id="resources" class="view-section">
+  <div class="animate-stagger max-w-6xl mx-auto space-y-12">
+    <div class="dark-gradient-card rounded-[3rem] p-12 md:p-16 shadow-secondary text-white relative overflow-hidden">
+      <div class="relative z-10">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-10 mb-10">
+          <div>
+            <h2 class="text-5xl font-serif font-bold mb-4">Financial Navigation</h2>
+            <p class="text-blue-200 text-2xl">Remove the barriers to your health.</p>
+          </div>
+          <i class="ph-fill ph-wallet text-[6rem] text-brand-light opacity-40"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div class="bg-white rounded-[3rem] p-10 md:p-12 shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+        <div>
+          <div class="flex items-center mb-8">
+            <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mr-5"><i class="ph-fill ph-receipt text-brand text-3xl"></i></div>
+            <h3 class="text-3xl font-serif font-bold text-slate-900">"What It Costs You"</h3>
+          </div>
+          <p class="text-lg text-slate-600 mb-8 leading-relaxed">Fear of the bill stops people. Select your insurance to see the actual law regarding CT scan costs.</p>
+          <div class="select-wrapper mb-8">
+            <select id="costCalcInsurance" class="w-full input-light rounded-2xl p-5 text-xl font-bold" onchange="updateCostCalc()">
+              <option value="default">Select Insurance Type...</option>
+              <option value="uninsured">Uninsured</option>
+              <option value="medicaid">Medicaid</option>
+              <option value="private">Private / Employer Plan</option>
+              <option value="medicare">Medicare</option>
+            </select>
+          </div>
+        </div>
+        <div id="costResult" class="hidden bg-slate-50 rounded-[2rem] p-8 border border-gray-200 transition-all mt-auto shadow-inner">
+          <div class="flex justify-between items-center mb-4">
+            <span class="section-label text-slate-500 text-sm">Estimated Copay:</span>
+            <span id="costAmount" class="text-5xl font-serif font-bold text-slate-900">$0</span>
+          </div>
+          <p id="costExplanation" class="text-base text-slate-500 mt-6 border-t border-gray-200 pt-6 leading-relaxed"></p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-[3rem] p-10 md:p-12 shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
+        <div>
+          <div class="flex items-center mb-8">
+            <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mr-5"><i class="ph-fill ph-money text-success text-3xl"></i></div>
+            <h3 class="text-3xl font-serif font-bold text-slate-900">Lost Wages Calculator</h3>
+          </div>
+          <div class="grid grid-cols-3 gap-4 mb-8">
+            <div>
+              <label class="block text-sm font-bold text-slate-500 mb-2">Hourly ($)</label>
+              <input type="number" id="wageHourly" value="15" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-slate-500 mb-2">Hrs/Wk</label>
+              <input type="number" id="wageHours" value="40" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-slate-500 mb-2">Weeks</label>
+              <input type="number" id="wageWeeks" value="4" min="1" max="12" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
+            </div>
+          </div>
+        </div>
+        <div class="mt-auto">
+          <div class="bg-emerald-50 rounded-[2rem] p-8 border border-emerald-100 flex justify-between items-center mb-6 shadow-sm">
+            <div>
+              <div class="section-label text-emerald-700 text-sm mb-1">Est. Total Loss</div>
+              <div id="lostWagesTotal" class="text-5xl font-serif font-bold text-emerald-900">$2,400</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto text-center pt-12 mt-12 border-t border-gray-200">
+      <button onclick="switchView('community')" class="bg-slate-900 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        Next: Community Action <i class="ph-bold ph-arrow-right ml-3 text-2xl"></i>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMMUNITY ACTION ================= -->
+<section id="community" class="view-section">
+  <div class="animate-stagger max-w-6xl mx-auto space-y-14">
+    <div class="text-center mb-12">
+      <div class="section-label text-brand mb-5 text-sm">Grassroots Power</div>
+      <h2 class="text-slate-900 mb-5 text-5xl">Bring Screening to Your Block</h2>
+      <p class="text-slate-600 text-xl max-w-3xl mx-auto">Websites don't save lives—people do. Use our beautifully designed toolkits for trusted community spaces nationwide.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div class="bg-white rounded-[3rem] overflow-hidden interactive-card flex flex-col shadow-secondary border border-gray-200 relative">
+        <div class="h-64 relative flex items-center justify-center" style="background: radial-gradient(circle at top right, #d97706, #78350f);">
+          <i class="ph-fill ph-scissors text-[9rem] text-white/10 absolute -right-6 -bottom-6"></i>
+          <h3 class="text-5xl font-serif font-bold relative z-10 px-8 text-white drop-shadow-md text-center">Barbershop <br>& Salon Kit</h3>
+        </div>
+        <div class="p-10 flex-grow flex flex-col justify-between bg-white relative border-t border-slate-200">
+          <p class="text-slate-800 text-lg mb-8 leading-relaxed font-semibold relative z-10">Printable posters with QR codes and conversation guides for spaces where health conversations happen organically.</p>
+          <button onclick="downloadToolkit('barbershop')" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-extrabold text-xl hover:bg-slate-800 transition-colors shadow-md relative z-10">Download PDF Toolkit</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-[3rem] overflow-hidden interactive-card flex flex-col shadow-secondary border border-gray-200 relative">
+        <div class="h-64 relative flex items-center justify-center" style="background: radial-gradient(circle at top left, #6b21a8, #312e81);">
+          <i class="ph-fill ph-church text-[9rem] text-white/10 absolute -left-6 -bottom-6"></i>
+          <h3 class="text-5xl font-serif font-bold relative z-10 px-8 text-white drop-shadow-md text-center">Faith <br>Partnership</h3>
+        </div>
+        <div class="p-10 flex-grow flex flex-col justify-between bg-white relative border-t border-slate-200">
+          <p class="text-slate-800 text-lg mb-8 leading-relaxed font-semibold relative z-10">Bulletin inserts, pastor talking points, and a ready-made "Lung Sunday" event guide for local congregations.</p>
+          <button onclick="downloadToolkit('church')" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-extrabold text-xl hover:bg-slate-800 transition-colors shadow-md relative z-10">Download PDF Guide</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-[#f8fafc] rounded-[3rem] p-10 md:p-12 shadow-primary border border-gray-200 flex flex-col justify-between mt-12">
+      <div>
+        <div class="flex items-center mb-6">
+          <i class="ph-fill ph-bank text-slate-900 text-4xl mr-4"></i>
+          <h3 class="text-3xl font-serif font-bold text-slate-900">Make Your Voice Heard</h3>
+        </div>
+        <p class="text-lg text-slate-600 mb-8 leading-relaxed">Help us advocate for mobile screening units in high-risk national zip codes.</p>
+      </div>
+      <div class="space-y-4">
+        <a href="https://www.usa.gov/elected-officials" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between px-8 py-5 bg-white border border-gray-200 rounded-xl font-bold text-lg text-slate-900 hover:bg-slate-100 transition-colors w-full text-left shadow-sm">
+          <span>Find Your Representatives</span><i class="ph-bold ph-envelope-simple text-2xl text-slate-500"></i>
+        </a>
+        <button onclick="downloadToolkit('factsheet')" class="flex items-center justify-between px-8 py-5 bg-white border border-gray-200 rounded-xl font-bold text-lg text-slate-900 hover:bg-slate-100 transition-colors w-full text-left shadow-sm">
+          <span>Download Advocacy PDF Fact Sheet</span><i class="ph-bold ph-download-simple text-2xl text-brand"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto text-center pt-12 mt-12 border-t border-gray-200">
+      <button onclick="switchView('chatbot')" class="bg-teal-700 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-teal-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        <i class="ph-bold ph-brain mr-3 text-2xl"></i> Talk to LungCoach AI
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AI CHATBOT ================= -->
+<section id="chatbot" class="view-section h-[calc(100vh-180px)] max-h-[900px] pb-10">
+  <div class="max-w-4xl mx-auto h-full flex flex-col bg-white rounded-[3rem] shadow-secondary border border-gray-200 overflow-hidden">
+    <div class="bg-slate-900 p-8 flex items-center justify-between shadow-md z-10 relative">
+      <div class="flex items-center">
+        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-brand flex items-center justify-center mr-5 shadow-inner border-2 border-slate-700">
+          <i class="ph-fill ph-lungs text-white text-3xl"></i>
+        </div>
+        <div>
+          <h3 class="text-2xl font-serif font-bold text-white">LungCoach AI</h3>
+          <p class="text-sm text-blue-200 font-medium">Powered by Claude · All conversations are anonymous</p>
+        </div>
+      </div>
+      <button onclick="clearChat()" class="text-slate-400 hover:text-white transition-colors text-sm font-bold flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
+        <i class="ph-bold ph-trash text-base"></i> Clear
+      </button>
+    </div>
+
+    <div id="chatThread" class="flex-grow p-8 overflow-y-auto bg-slate-50 space-y-6">
+      <div class="flex items-start">
+        <div class="w-10 h-10 rounded-full bg-teal-600 flex-shrink-0 flex items-center justify-center mt-1 mr-4 shadow-sm">
+          <i class="ph-fill ph-lungs text-white text-lg"></i>
+        </div>
+        <div class="chat-bubble-ai p-5 text-base text-slate-800 shadow-sm max-w-[85%] leading-relaxed font-medium">
+          Hi, I'm LungCoach — powered by Claude AI. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6 bg-white border-t border-gray-200">
+      <div class="relative flex items-center">
+        <input type="text" id="chatInput" placeholder="Ask about costs, screening, quitting smoking..." class="w-full input-light rounded-full py-5 pl-6 pr-20 text-lg font-medium" onkeypress="handleChatEnter(event)" oninput="updateCharCount()">
+        <button id="chatSendBtn" onclick="sendChatMessage()" disabled class="absolute right-3 w-12 h-12 bg-teal-600 text-white rounded-full flex items-center justify-center hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md">
+          <i class="ph-bold ph-paper-plane-right text-xl"></i>
+        </button>
+      </div>
+      <div class="flex justify-between items-center mt-3 px-4 text-xs font-bold text-slate-400">
+        <span><i class="ph-fill ph-shield-check mr-1"></i> All data is anonymous. Not a medical diagnosis.</span>
+        <span id="chatCharCount">0/500</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- Footer -->
+<footer class="bg-slate-50 text-slate-700 py-16 mt-auto border-t border-slate-200 shadow-inner">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-12">
+    <div>
+      <span class="font-serif italic font-bold text-4xl text-slate-900 block mb-3">LungIQ</span>
+      <p class="text-base mb-6 leading-relaxed text-slate-700">Focusing on equitable access to lung health nationwide. All data is collected anonymously.</p>
+      <span class="text-sm font-bold bg-slate-200 px-4 py-2 rounded-full text-slate-800 tracking-wider border border-slate-300">Built for ALCSI 2025</span>
+    </div>
+    <div class="flex flex-col space-y-3 text-base font-bold">
+      <h4 class="text-slate-900 font-bold mb-3 text-lg">Quick Links</h4>
+      <a href="#" onclick="switchView('calculator'); window.scrollTo(0,0); return false;" class="text-slate-700 hover:text-brand transition-colors">Assess Risk</a>
+      <a href="#" onclick="switchView('equity-data'); window.scrollTo(0,0); return false;" class="text-slate-700 hover:text-brand transition-colors">Equity Data</a>
+      <a href="#" onclick="switchView('resources'); window.scrollTo(0,0); return false;" class="text-slate-700 hover:text-brand transition-colors">Financial Navigator</a>
+      <a href="#" onclick="switchView('community'); window.scrollTo(0,0); return false;" class="text-slate-700 hover:text-brand transition-colors">Community Action</a>
+    </div>
+    <div>
+      <h4 class="text-slate-900 font-bold mb-4 text-lg">Emergency Resources</h4>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <p class="text-sm text-slate-500 mb-1 font-bold">National Crisis Line</p>
+        <p class="text-2xl font-bold text-brand mb-4">988</p>
+        <p class="text-sm text-slate-500 mb-1 font-bold">National Tobacco Quitline</p>
+        <p class="text-2xl font-bold text-brand">1-800-QUIT-NOW</p>
+      </div>
+    </div>
+  </div>
+  <div class="max-w-7xl mx-auto px-4 mt-16 pt-8 border-t border-slate-200 text-center text-sm font-bold text-slate-600">
+    &copy; 2025 LungIQ Initiative. This tool is for educational purposes only. Based on the <strong>PLCOm2012</strong> model (Tammemägi et al., 2013).
+  </div>
+</footer>
+
+<button id="backToTop" onclick="window.scrollTo(0,0)" class="fixed bottom-8 right-8 w-14 h-14 bg-slate-900 backdrop-blur-md text-white rounded-full flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 z-40 hover:bg-brand shadow-2xl border border-slate-700">
+  <i class="ph-bold ph-arrow-up text-2xl"></i>
+</button>
+
+<script>
+// ============================================================
+// CONSTANTS & GLOBALS
+// ============================================================
+const SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycby_qA7jwdeBGCy-xCMseTXZ1M_pvPv6rwWpguEz7hnfDkd1PfugYeGTFvc9L5CJ_rM/exec";
+
+// Generate a unique session ID once per user visit so updates can be linked to the initial risk assessment
+let currentSessionId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+let trackingData = {
+   phone: "",
+   downloads: [],
+   aiMsgCount: 0
+};
+
+// ============================================================
+// 0. INIT & GLOBAL UI
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  window.addEventListener('scroll', () => {
+    const btt = document.getElementById('backToTop');
+    const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+    if (winScroll > 400) { btt.style.opacity = '1'; btt.style.pointerEvents = 'auto'; }
+    else { btt.style.opacity = '0'; btt.style.pointerEvents = 'none'; }
+  });
+  calcLostWages();
+});
+
+function switchView(viewId) {
+  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+  const newView = document.getElementById(viewId);
+  newView.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelectorAll('.nav-link').forEach(btn => {
+    if (btn.innerText.toLowerCase().includes(viewId.replace('-', ' ').split(' ')[0]))
+      btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+
+// ============================================================
+// 1. PLCO m2012 RISK MODEL (ported from Python)
+// ============================================================
+function logistic(x) {
+  x = Math.max(-500, Math.min(500, x));
+  return 1 / (1 + Math.exp(-x));
+}
+
+function plco_m2012(age, education, bmi, copd, cancer_hist, family_hist,
+                    smoking_status, smoking_intensity, duration_smoking, smoking_quit_time) {
+  let m = (
+    0.0778868  * (age - 62)
+    - 0.0812744 * (education - 4)
+    - 0.0274194 * (bmi - 27)
+    + 0.3553063 * copd
+    + 0.4589971 * cancer_hist
+    + 0.587185  * family_hist
+    + 0.2597431 * smoking_status
+    + 0.0317321 * (duration_smoking - 27)
+    - 0.0308572 * (smoking_quit_time - 10)
+    - 4.532506
+  );
+  if (smoking_status === 1 && smoking_intensity > 0) {
+    m += -1.822606 * (Math.pow(smoking_intensity / 10, -1) - 0.4021541613);
+  }
+  return logistic(m);
+}
+
+function extrapolateRisk(age, education, bmi, copd, cancer_hist, family_hist,
+                         smoking_status, smoking_intensity, duration_smoking, smoking_quit_time) {
+  if (age < 40) {
+    const base = plco_m2012(40, education, bmi, copd, cancer_hist, family_hist,
+                            smoking_status, smoking_intensity, duration_smoking, smoking_quit_time);
+    return base * Math.exp(-0.065 * (40 - age));
+  } else if (age > 80) {
+    return plco_m2012(80, education, bmi, copd, cancer_hist, family_hist,
+                      smoking_status, smoking_intensity, duration_smoking, smoking_quit_time);
+  } else {
+    return plco_m2012(age, education, bmi, copd, cancer_hist, family_hist,
+                      smoking_status, smoking_intensity, duration_smoking, smoking_quit_time);
+  }
+}
+
+function riskCategory(risk_pct) {
+  if (risk_pct >= 3.0) return 'high';
+  if (risk_pct >= 1.3) return 'moderate';
+  return 'low';
+}
+
+function lungAgeFromRisk(actual_age, risk_pct) {
+  let offset;
+  if (risk_pct <= 0.1)      offset = -8;
+  else if (risk_pct <= 0.5) offset = -4;
+  else if (risk_pct < 1.3)  offset = 0;
+  else if (risk_pct < 3.0)  offset = Math.floor((risk_pct - 1.3) * 6);
+  else if (risk_pct < 6.0)  offset = Math.floor(10 + (risk_pct - 3.0) * 4);
+  else                       offset = Math.floor(22 + (risk_pct - 6.0) * 2);
+  return Math.max(10, Math.min(100, actual_age + offset));
+}
+
+function uspstfQualifies(age, smoking_status, pack_years) {
+  if (smoking_status === 'never')
+    return { qualifies: false, msg: 'Non-smokers do not qualify for USPSTF lung screening guidelines.' };
+  if (age < 50 || age > 80)
+    return { qualifies: false, msg: `USPSTF guidelines apply to ages 50–80 (your age: ${age}).` };
+  if (pack_years < 20)
+    return { qualifies: false, msg: `USPSTF requires ≥20 pack-years (yours: ${pack_years.toFixed(1)}).` };
+  return { qualifies: true, msg: 'You meet all USPSTF 2021 criteria for annual low-dose CT (LDCT) lung screening.' };
+}
+
+// Global store for simulator
+let currentUserRiskData = null;
+let actionsCompleted = 0;
+let totalActions = 0;
+
+// ============================================================
+// 2. GOOGLE SHEETS LOGGING & TRACKING
+// ============================================================
+async function logToSheets(data) {
+  try {
+    await fetch(SHEETS_WEBHOOK, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) {
+    console.log('Google Sheets logging (non-critical):', e);
+  }
+}
+
+// Submits tracking updates (phone, downloads, AI chats) linked by session_id
+function sendTrackingUpdate() {
+   logToSheets({
+      action: "update_tracking",
+      session_id: currentSessionId,
+      phone_number: trackingData.phone,
+      toolkits_downloaded: trackingData.downloads.join(', '),
+      ai_messages_sent: trackingData.aiMsgCount
+   });
+}
+
+// ============================================================
+// 3. CALCULATOR FORM LOGIC
+// ============================================================
+document.querySelectorAll('.form-input-track').forEach(input => {
+  input.addEventListener('change', updateFormProgress);
+  input.addEventListener('focus', (e) => {
+    const section = e.target.closest('.form-section').id;
+    let step = 1;
+    if (section === 'section-about')   step = 2;
+    if (section === 'section-medical') step = 3;
+    if (section === 'section-action')  step = 4;
+    [1,2,3,4].forEach(i => {
+      const dot = document.getElementById(`step${i}`);
+      if (i <= step) dot.className = "step-dot w-4 h-4 rounded-full bg-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.8)] transition-all";
+      else dot.className = "step-dot w-4 h-4 rounded-full bg-white/20 transition-all";
+    });
+    const texts = ['Location', 'About You', 'Medical & Smoking', 'Barriers'];
+    document.getElementById('formProgressText').innerText = `Step ${step}: ${texts[step-1]}`;
+  });
+});
+
+function updateFormProgress() {
+  let filled = 0;
+  // Included areaType to make it out of 6
+  const fields = ['zipCode', 'areaType', 'insurance', 'age', 'smokingStatus', 'barrierHidden'];
+  fields.forEach(id => { if (document.getElementById(id).value !== "") filled++; });
+  document.getElementById('fieldsComplete').innerText = `${filled} of 6 fields complete`;
+}
+
+function validateZip() {
+  const zipInput = document.getElementById('zipCode');
+  zipInput.value = zipInput.value.replace(/[^0-9]/g, '').slice(0, 5);
+  const icon = document.getElementById('zipValidIcon');
+  if (zipInput.value.length === 5)
+    icon.classList.replace('text-slate-600', 'text-green-500');
+  else
+    icon.classList.replace('text-green-500', 'text-slate-600');
+}
+
+function checkInsuranceBanner() {
+  const ins = document.getElementById('insurance').value;
+  const banner = document.getElementById('uninsuredBanner');
+  if (ins === 'uninsured') {
+    banner.style.display = 'block';
+    setTimeout(() => { banner.style.maxHeight = '150px'; banner.style.opacity = '1'; }, 10);
+  } else {
+    banner.style.maxHeight = '0'; banner.style.opacity = '0';
+    setTimeout(() => { banner.style.display = 'none'; }, 400);
+  }
+}
+
+function toggleSmokingDetails() {
+  const status = document.getElementById('smokingStatus').value;
+  const detailsDiv = document.getElementById('smokingDetails');
+  const yearsQuitDiv = document.getElementById('yearsQuitContainer');
+  if (status === 'current') {
+    detailsDiv.style.display = 'block';
+    setTimeout(() => { detailsDiv.style.maxHeight = '300px'; detailsDiv.style.opacity = '1'; }, 10);
+    yearsQuitDiv.classList.add('hidden');
+    document.getElementById('yearsQuit').removeAttribute('required');
+  } else if (status === 'former') {
+    detailsDiv.style.display = 'block';
+    setTimeout(() => { detailsDiv.style.maxHeight = '300px'; detailsDiv.style.opacity = '1'; }, 10);
+    yearsQuitDiv.classList.remove('hidden');
+    document.getElementById('yearsQuit').setAttribute('required', 'true');
+  } else {
+    detailsDiv.style.maxHeight = '0'; detailsDiv.style.opacity = '0';
+    setTimeout(() => { detailsDiv.style.display = 'none'; }, 400);
+  }
+}
+
+function selectBarrier(el, value) {
+  document.querySelectorAll('.barrier-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('barrierHidden').value = value;
+  updateFormProgress();
+}
+
+// ============================================================
+// 4. CALCULATE RISK (PLCOm2012 + Google Sheets)
+// ============================================================
+async function calculateRisk(event) {
+  event.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const icon = document.getElementById('submitIcon');
+  const text = document.getElementById('submitText');
+
+  const zipInput = document.getElementById('zipCode');
+  const zipCode = zipInput.value.replace(/[^0-9]/g, '').slice(0, 5);
+  zipInput.value = zipCode;
+  if (zipCode.length !== 5) { alert("Please enter a valid 5-digit US Zip Code."); return; }
+
+  btn.classList.add('opacity-80', 'cursor-wait');
+  icon.className = "ph-bold ph-circle-notch animate-spin mr-4 text-3xl";
+  text.innerText = "Connecting to National Database...";
+
+  // Fetch ZIP info
+  const zipData = await fetchNationalData(zipCode);
+  if (zipData.error) {
+    btn.classList.remove('opacity-80', 'cursor-wait');
+    icon.className = "ph-bold ph-stethoscope mr-4 text-3xl";
+    text.innerText = "Calculate My Lung Risk";
+    alert("We couldn't find that Zip Code. Please check and try again.");
+    return;
+  }
+
+  // Read form values
+  const areaType    = document.getElementById('areaType').value;
+  const age         = parseInt(document.getElementById('age').value) || 55;
+  const race        = document.getElementById('raceInput').value;
+  const educationEl = document.getElementById('education');
+  const educationVal = parseInt(educationEl.value) || 2;
+  const educationText = educationEl.options[educationEl.selectedIndex].text; // Capturing text string for the sheet
+
+  const heightFt    = parseInt(document.getElementById('heightFt').value) || 5;
+  const heightIn    = parseInt(document.getElementById('heightIn').value) || 8;
+  const weightLbs   = parseInt(document.getElementById('weightLbs').value) || 170;
+  const heightTotal = (heightFt * 12) + heightIn;
+  const bmi         = (weightLbs / (heightTotal * heightTotal)) * 703;
+
+  const copd        = parseInt(document.getElementById('copd').value) || 0;
+  const cancerHist  = parseInt(document.getElementById('cancerHist').value) || 0;
+  const familyHist  = parseInt(document.getElementById('familyHist').value) || 0;
+
+  const smokingStatus = document.getElementById('smokingStatus').value;
+  const smokingStatusVal = (smokingStatus === 'never') ? 0 : 1;
+  const cigsPerDay  = parseInt(document.getElementById('cigsPerDay').value) || 0;
+  const yearsSmoked = parseInt(document.getElementById('yearsSmoked').value) || 0;
+  const yearsQuit   = (smokingStatus === 'former') ? (parseInt(document.getElementById('yearsQuit').value) || 0) : 0;
+  const packYears   = (cigsPerDay / 20) * yearsSmoked;
+
+  const insurance = document.getElementById('insurance').value;
+  const barrier   = document.getElementById('barrierHidden').value || 'none';
+
+  // PLCOm2012 risk calculation
+  const risk     = extrapolateRisk(age, educationVal, bmi, copd, cancerHist, familyHist,
+                                   smokingStatusVal, cigsPerDay, yearsSmoked, yearsQuit);
+  const riskPct  = risk * 100;
+  const category = riskCategory(riskPct);
+  const lungAge  = lungAgeFromRisk(age, riskPct);
+  const uspstf   = uspstfQualifies(age, smokingStatus, packYears);
+
+  // Store for simulator
+  currentUserRiskData = { age, educationVal, bmi, copd, cancerHist, familyHist,
+                          smokingStatus, smokingStatusVal, cigsPerDay, yearsSmoked, yearsQuit,
+                          packYears, riskPct, category, lungAge };
+
+  // Log to Google Sheets (anonymous)
+  logToSheets({
+    action: "submit_risk",
+    session_id: currentSessionId,
+    timestamp: new Date().toISOString(),
+    zip: zipCode,
+    area_type: areaType,
+    state: zipData.c,
+    age, race,
+    education: educationText, 
+    bmi: Math.round(bmi * 10) / 10,
+    smoking_status: smokingStatus,
+    pack_years: Math.round(packYears * 10) / 10,
+    copd, cancer_hist: cancerHist, family_hist: familyHist,
+    risk_pct: Math.round(riskPct * 100) / 100,
+    risk_group: category,
+    lung_age: lungAge,
+    uspstf_eligible: uspstf.qualifies,
+    insurance, barrier
+  });
+
+  renderResults(category, riskPct, lungAge, packYears, insurance, barrier,
+                smokingStatus, age, zipData.n, zipData.c, uspstf, cigsPerDay, yearsSmoked, copd, cancerHist, familyHist);
+
+  btn.classList.remove('opacity-80', 'cursor-wait');
+  icon.className = "ph-bold ph-stethoscope mr-4 text-3xl";
+  text.innerText = "Calculate My Lung Risk";
+  switchView('results');
+}
+
+// ============================================================
+// 5. RENDER RESULTS
+// ============================================================
+function renderResults(category, riskPct, lungAge, packYears, insurance, barrier,
+                       smokeStatus, age, city, state, uspstf, cigsPerDay, yearsSmoked, copd, cancerHist, familyHist) {
+  const header = document.getElementById('resultHeader');
+  const icon   = document.getElementById('resultIcon');
+  const title  = document.getElementById('resultTitle');
+  const desc   = document.getElementById('resultDesc');
+
+  document.getElementById('nearestZip').innerText = `${city}, ${state}`;
+  document.getElementById('clinicCity1').innerText = `${city} Regional Hospital`;
+  document.getElementById('clinicCity2').innerText = `${state} Health Outpatient`;
+  document.getElementById('clinicCity3').innerText = `${city} Free Clinic Network`;
+
+  // PLCOm2012 stats bar
+  document.getElementById('plcoStatsBar').classList.remove('hidden');
+  document.getElementById('plcoRiskPct').innerText = riskPct.toFixed(2) + '%';
+  document.getElementById('plcoLungAge').innerText = lungAge + ' yrs';
+  document.getElementById('plcoPackYears').innerText = packYears > 0 ? packYears.toFixed(1) : 'N/A';
+
+  // USPSTF banner
+  const uspstfBanner = document.getElementById('uspstfBanner');
+  uspstfBanner.classList.remove('hidden');
+  document.getElementById('uspstfTitle').innerText = uspstf.qualifies
+    ? '✅ You qualify for USPSTF 2021 annual LDCT screening'
+    : 'ℹ️ USPSTF Screening Eligibility';
+  document.getElementById('uspstfMsg').innerText = uspstf.msg;
+  uspstfBanner.style.borderColor = uspstf.qualifies ? '#3b82f6' : '#d1d5db';
+  uspstfBanner.style.backgroundColor = uspstf.qualifies ? '#eff6ff' : '#f8fafc';
+
+  if (category === 'high') {
+    header.className = "bg-white rounded-[3rem] p-10 md:p-16 shadow-secondary border-l-[8px] border-danger flex flex-col md:flex-row items-center gap-10 relative overflow-hidden risk-high-bg stripes-bg";
+    icon.className   = "w-32 h-32 rounded-full bg-rose-50 text-danger flex items-center justify-center text-7xl shrink-0 z-10 relative shadow-[0_0_30px_rgba(225,29,72,0.4)]";
+    icon.innerHTML   = '<i class="ph-fill ph-warning animate-pulse"></i>';
+    title.innerText  = "High Risk — Lung Screening Strongly Recommended.";
+    desc.innerHTML   = `Clinical guidelines indicate you should speak with your doctor about an annual low-dose CT scan. <b class='text-danger'>Caught early, lung cancer has an 80% survival rate.</b>`;
+    document.getElementById('simulatorCard').classList.remove('hidden');
+    document.getElementById('actionPlanContainer').classList.remove('hidden');
+    generateActionPlan(barrier, insurance, smokeStatus);
+  } else if (category === 'moderate') {
+    header.className = "bg-white rounded-[3rem] p-10 md:p-16 shadow-secondary border-l-[8px] border-warning flex flex-col md:flex-row items-center gap-10 relative overflow-hidden risk-mod-bg";
+    icon.className   = "w-32 h-32 rounded-full bg-amber-50 text-warning flex items-center justify-center text-7xl shrink-0 z-10 relative shadow-[0_0_30px_rgba(217,119,6,0.3)]";
+    icon.innerHTML   = '<i class="ph-fill ph-warning-circle"></i>';
+    title.innerText  = "Moderate Risk — Discuss Screening With Your Doctor.";
+    desc.innerHTML   = `You have elevated risk factors worth discussing at your next annual visit. <b class='text-warning'>A conversation with your doctor could be lifesaving.</b>`;
+    document.getElementById('simulatorCard').classList.remove('hidden');
+    document.getElementById('actionPlanContainer').classList.remove('hidden');
+    generateActionPlan(barrier, insurance, smokeStatus);
+  } else {
+    header.className = "bg-white rounded-[3rem] p-10 md:p-16 shadow-secondary border-l-[8px] border-success flex flex-col md:flex-row items-center gap-10 relative overflow-hidden risk-low-bg";
+    icon.className   = "w-32 h-32 rounded-full bg-emerald-50 text-success flex items-center justify-center text-7xl shrink-0 z-10 relative shadow-[0_0_30px_rgba(5,150,105,0.3)]";
+    icon.innerHTML   = '<i class="ph-fill ph-check-circle"></i>';
+    title.innerText  = "Lower Risk — Keep Up Healthy Habits.";
+    desc.innerHTML   = `You don't currently meet criteria for annual lung screening. Continue wellness visits and <b class='text-success'>maintain healthy habits to keep your risk low.</b>`;
+    document.getElementById('simulatorCard').classList.add('hidden');
+    document.getElementById('actionPlanContainer').classList.add('hidden');
+  }
+
+  // Risk breakdown
+  const breakdownHtml = [];
+  if (smokeStatus === 'current')
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-cigarette"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">Active Smoking</span><span class="text-sm font-bold text-rose-600 uppercase tracking-widest">High Impact</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-rose-500 h-3 rounded-full" style="width:90%"></div></div></div></div>`);
+  else if (smokeStatus === 'former')
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-cigarette-slash"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">Former Smoking History</span><span class="text-sm font-bold text-amber-600 uppercase tracking-widest">Moderate Impact</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-amber-500 h-3 rounded-full" style="width:60%"></div></div></div></div>`);
+  if (age >= 50)
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-calendar"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">Age Factor (Over 50)</span><span class="text-sm font-bold text-blue-600 uppercase tracking-widest">Moderate Impact</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-blue-500 h-3 rounded-full" style="width:50%"></div></div></div></div>`);
+  if (copd == 1)
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-lungs"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">COPD Diagnosis</span><span class="text-sm font-bold text-purple-600 uppercase tracking-widest">High Impact</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-purple-500 h-3 rounded-full" style="width:70%"></div></div></div></div>`);
+  if (familyHist == 1)
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-users"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">Family History of Lung Cancer</span><span class="text-sm font-bold text-teal-600 uppercase tracking-widest">Moderate Impact</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-teal-500 h-3 rounded-full" style="width:55%"></div></div></div></div>`);
+  if (insurance === 'uninsured')
+    breakdownHtml.push(`<div class="flex items-center"><div class="w-12 h-12 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center mr-5 text-2xl"><i class="ph-fill ph-wallet"></i></div><div class="flex-grow"><div class="flex justify-between mb-2"><span class="font-bold text-lg text-slate-800">No Insurance Access</span><span class="text-sm font-bold text-slate-600 uppercase tracking-widest">Access Barrier</span></div><div class="w-full bg-slate-100 h-3 rounded-full"><div class="bg-slate-400 h-3 rounded-full" style="width:100%"></div></div></div></div>`);
+  if (breakdownHtml.length === 0)
+    breakdownHtml.push("<p class='text-slate-500 text-lg'>No major risk factors identified based on your inputs. Maintain regular wellness visits.</p>");
+
+  document.getElementById('riskBreakdownList').innerHTML = breakdownHtml.join('');
+}
+
+// ============================================================
+// 6. ACTION PLAN
+// ============================================================
+function generateActionPlan(barrier, insurance, smokeStatus) {
+  const list = document.getElementById('actionPlanList');
+  let actions = [];
+
+  if (insurance === 'uninsured' || barrier === 'cost')
+    actions.push({ icon: 'ph-hospital', title: "Visit a local FQHC Clinic", desc: "You qualify for free sliding-scale screening locally.", time: "Takes 10 mins", btn: "View Directory" });
+  else if (insurance === 'medicaid')
+    actions.push({ icon: 'ph-phone-call', title: "Call your primary doctor", desc: "Tell them: 'I qualify for a Low-Dose CT under Medicaid'.", time: "Takes 5 mins", btn: "Get Script Guide" });
+  else if (insurance === 'medicare')
+    actions.push({ icon: 'ph-phone-call', title: "Request LDCT from your doctor", desc: "Medicare covers 100% of LDCT for eligible patients.", time: "Takes 5 mins", btn: "Learn More" });
+  else
+    actions.push({ icon: 'ph-phone-call', title: "Contact your insurance", desc: "Ask about LDCT coverage — most plans cover it at 0 copay.", time: "Takes 10 mins", btn: "Verify Coverage" });
+
+  if (smokeStatus === 'current')
+    actions.push({ icon: 'ph-leaf', title: "Sign up for State Quitline", desc: "Get free nicotine patches mailed to your house.", time: "Takes 5 mins", btn: "Sign Up Now" });
+
+  if (barrier === 'transportation')
+    actions.push({ icon: 'ph-ambulance', title: "Request Medicaid NEMT", desc: "Non-Emergency Medical Transportation covers your round trip.", time: "Takes 2 mins", btn: "Get Code" });
+
+  if (actions.length === 0)
+    actions.push({ icon: 'ph-calendar-check', title: "Schedule a Wellness Visit", desc: "Talk to your doctor about your lung health and risk factors.", time: "Takes 5 mins", btn: "Learn More" });
+
+  actionsCompleted = 0;
+  totalActions = actions.length;
+  document.getElementById('actionPlanSuccess').classList.add('hidden');
+
+  let html = '';
+  actions.forEach((a, i) => {
+    html += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-6 bg-slate-50 border border-gray-200 rounded-2xl group transition-all" id="actionItem${i}">
+      <div class="flex items-start sm:items-center w-full">
+        <label class="cursor-pointer flex items-center justify-center mr-5 mt-1 sm:mt-0">
+          <input type="checkbox" class="w-8 h-8 rounded-lg text-brand focus:ring-brand cursor-pointer" onchange="toggleAction(${i}, ${actions.length})">
+        </label>
+        <div class="flex-grow flex flex-col sm:flex-row sm:items-center">
+          <div class="hidden sm:flex w-12 h-12 bg-white rounded-full border border-gray-200 items-center justify-center font-bold text-brand mr-5 shadow-sm text-xl">${i+1}</div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-xl action-title transition-all">${a.title}</h4>
+            <p class="text-base text-slate-500 mt-1">${a.desc} <span class="text-xs font-bold text-slate-400 ml-2 uppercase tracking-wider">⏱ ${a.time}</span></p>
+          </div>
+        </div>
+        <button class="mt-4 sm:mt-0 sm:ml-4 bg-slate-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-slate-800 whitespace-nowrap shadow-sm">${a.btn}</button>
+      </div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function toggleAction(index, total) {
+  const item     = document.getElementById(`actionItem${index}`);
+  const checkbox = item.querySelector('input');
+  const title    = item.querySelector('.action-title');
+  if (checkbox.checked) {
+    item.classList.add('bg-green-50', 'border-green-200');
+    title.classList.add('line-through', 'text-slate-400');
+    actionsCompleted++;
+  } else {
+    item.classList.remove('bg-green-50', 'border-green-200');
+    title.classList.remove('line-through', 'text-slate-400');
+    actionsCompleted--;
+  }
+  if (actionsCompleted === total)
+    document.getElementById('actionPlanSuccess').classList.remove('hidden');
+  else
+    document.getElementById('actionPlanSuccess').classList.add('hidden');
+}
+
+// ============================================================
+// 7. SIMULATOR (PLCOm2012-based)
+// ============================================================
+function updateSimulator() {
+  const res    = document.getElementById('simResult');
+  const quit   = document.getElementById('simQuit').checked;
+  const screen = document.getElementById('simScreen').checked;
+  const d      = currentUserRiskData;
+
+  if (!d) { res.innerText = "Toggle options above to see how your future changes."; return; }
+
+  let msgs = [];
+
+  if (quit && d.smokingStatus !== 'never') {
+    // Simulate quitting: former smoker with 5 smoke-free years
+    const quitRisk    = extrapolateRisk(d.age, d.educationVal, d.bmi, d.copd, d.cancerHist,
+                                        d.familyHist, 1, d.cigsPerDay, d.yearsSmoked, 5) * 100;
+    const quitLungAge = lungAgeFromRisk(d.age, quitRisk);
+    const gain        = d.lungAge - quitLungAge;
+    if (gain > 0) msgs.push(`Quitting today could reduce your lung age by ${gain} years within 5 smoke-free years (${d.riskPct.toFixed(2)}% → ${quitRisk.toFixed(2)}% risk).`);
+    else msgs.push(`Your lungs begin healing immediately. Risk drops significantly over the next 5–10 years.`);
+  }
+
+  if (screen) msgs.push(`Annual LDCT screening raises 5-year survival from ~20% (late detection) to over 80% (early detection).`);
+
+  if (msgs.length === 0) res.innerText = "Toggle options above to see how your future changes.";
+  else res.innerText = msgs.join(" ");
+}
+
+// ============================================================
+// 8. EQUITY DATA DASHBOARD — REAL DATA ONLY
+// ============================================================
+async function fetchNationalData(zip) {
+  let result = {
+    error: false,
+    n: `Zip Code ${zip}`,
+    c: 'US',
+    s: 0,
+    a: 'Not available',
+    i: 'Not available',
+    u: 'Not available',
+    sm: 'Not available',
+    p: 'Not available',
+    lat: null,
+    lon: null
+  };
+
+  // 1. Real city/state from Zippopotamus
+  try {
+    const zipRes = await fetch(`https://api.zippopotam.us/us/${zip}`);
+    if (!zipRes.ok) return { error: true };
+    const zipData = await zipRes.json();
+    result.n   = zipData.places[0]['place name'];
+    result.c   = zipData.places[0]['state abbreviation'];
+    result.lat = zipData.places[0].latitude;
+    result.lon = zipData.places[0].longitude;
+  } catch (err) { return { error: true }; }
+
+  // 2. Real AQI from Open-Meteo
+  try {
+    if (result.lat && result.lon) {
+      const aqiRes = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${result.lat}&longitude=${result.lon}&current=us_aqi`);
+      if (aqiRes.ok) {
+        const aqiData = await aqiRes.json();
+        const aqi = aqiData.current.us_aqi;
+        if (aqi !== null && aqi !== undefined) {
+          if (aqi <= 50)       result.a = 'Good';
+          else if (aqi <= 100) result.a = 'Moderate';
+          else                 result.a = 'Poor';
+        }
+      }
+    }
+  } catch(e) { console.log('AQI fetch failed:', e); }
+
+  // 3. Real Census data
+  try {
+    const censusRes = await fetch(`https://api.census.gov/data/2022/acs/acs5/profile?get=DP03_0062E,DP03_0099PE,DP03_0119PE&for=zip%20code%20tabulation%20area:${zip}`);
+    if (censusRes.ok) {
+      const cData = await censusRes.json();
+      if (cData && cData.length > 1) {
+        const inc  = parseInt(cData[1][0]);
+        const unin = parseFloat(cData[1][1]);
+        const pov  = parseFloat(cData[1][2]);
+        if (inc > 0)    result.i = '$' + inc.toLocaleString();
+        if (unin >= 0)  result.u = unin.toFixed(1) + '%';
+        if (pov >= 0)   result.p = pov.toFixed(1) + '%';
+      }
+    }
+  } catch(e) { console.log('Census fetch failed:', e); }
+
+  // 4. Real CDC PLACES smoking rate
+  try {
+    const cdcRes = await fetch(`https://chronicdata.cdc.gov/resource/yswa-pfgw.json?locationname=${zip}&measureid=CSMOKING`);
+    if (cdcRes.ok) {
+      const cdcData = await cdcRes.json();
+      if (cdcData && cdcData.length > 0 && cdcData[0].data_value)
+        result.sm = parseFloat(cdcData[0].data_value).toFixed(1) + '%';
+    }
+  } catch(e) { console.log('CDC fetch failed:', e); }
+
+  // Equity score from real data only
+  let score = 100;
+  if (result.i !== 'Not available') {
+    const inc = parseInt(result.i.replace(/[^0-9]/g, ''));
+    if (inc < 40000)      score -= 25;
+    else if (inc < 60000) score -= 15;
+    else if (inc < 80000) score -= 5;
+  }
+  if (result.u !== 'Not available') {
+    const unin = parseFloat(result.u);
+    if (unin > 15)      score -= 20;
+    else if (unin > 10) score -= 10;
+  }
+  if (result.p !== 'Not available') {
+    const pov = parseFloat(result.p);
+    if (pov > 20)      score -= 15;
+    else if (pov > 10) score -= 5;
+  }
+  if (result.a === 'Poor')     score -= 15;
+  else if (result.a === 'Moderate') score -= 5;
+
+  result.s = Math.max(10, Math.min(99, score));
+  return result;
+}
+
+const updateMetricUI = (id, val, isBad, isGood) => {
+  const textEl = document.getElementById(`eq${id}`);
+  const icon   = document.getElementById(`icon${id}`);
+  const isNA   = (val === 'Not available');
+  if (textEl) textEl.innerText = isNA ? '—' : val;
+  if (!icon) return;
+  if (isNA)       icon.className = "ph-fill ph-minus-circle text-slate-400 text-3xl";
+  else if (isBad) icon.className = "ph-fill ph-warning-circle text-danger text-3xl";
+  else if (isGood) icon.className = "ph-fill ph-check-circle text-success text-3xl";
+  else            icon.className = "ph-fill ph-info text-warning text-3xl";
+};
+
+async function generateEquityReport() {
+  const zipInput = document.getElementById('equityZipInput');
+  const zip      = zipInput.value.replace(/[^0-9]/g, '').slice(0, 5);
+  zipInput.value = zip;
+
+  if (zip.length !== 5) { alert("Please enter a valid 5-digit US Zip Code."); return; }
+
+  document.getElementById('equityDashboardOutput').classList.add('hidden');
+  document.getElementById('equityError').classList.add('hidden');
+  document.getElementById('equitySkeleton').classList.remove('hidden');
+
+  const data = await fetchNationalData(zip);
+  document.getElementById('equitySkeleton').classList.add('hidden');
+
+  if (data.error) { document.getElementById('equityError').classList.remove('hidden'); return; }
+
+  document.getElementById('equityDashboardOutput').classList.remove('hidden');
+  document.getElementById('eqZipDisplay').innerText = `Zip Code: ${zip}`;
+  document.getElementById('eqNeighborhoodDisplay').innerText = `${data.n}, ${data.c}`;
+
+  const circle = document.getElementById('eqScoreCircle');
+  circle.style.strokeDasharray = `${data.s}, 100`;
+  document.getElementById('eqScoreDisplay').innerText = data.s;
+  if (data.s >= 70)      circle.style.stroke = "#059669";
+  else if (data.s < 45)  circle.style.stroke = "#e11d48";
+  else                   circle.style.stroke = "#d97706";
+
+  updateMetricUI('Poverty',   data.p, data.p !== 'Not available' && parseFloat(data.p) > 20, data.p !== 'Not available' && parseFloat(data.p) < 10);
+  updateMetricUI('AQI',       data.a, data.a === 'Poor', data.a === 'Good');
+  const incVal = (data.i !== 'Not available') ? parseInt(data.i.replace(/[^0-9]/g, '')) : 0;
+  updateMetricUI('Income',    data.i, data.i !== 'Not available' && incVal < 40000, data.i !== 'Not available' && incVal > 75000);
+  updateMetricUI('Uninsured', data.u, data.u !== 'Not available' && parseFloat(data.u) > 15, data.u !== 'Not available' && parseFloat(data.u) < 8);
+  updateMetricUI('Smoking',   data.sm, data.sm !== 'Not available' && parseFloat(data.sm) > 20, data.sm !== 'Not available' && parseFloat(data.sm) < 12);
+
+  document.getElementById('barValUnins').innerText  = (data.u  !== 'Not available') ? data.u  : '—';
+  document.getElementById('barZipUnins').style.width = (data.u !== 'Not available') ? data.u  : '0%';
+  document.getElementById('barValSmoke').innerText  = (data.sm !== 'Not available') ? data.sm : '—';
+  document.getElementById('barZipSmoke').style.width = (data.sm !== 'Not available') ? data.sm : '0%';
+
+  // Narrative — only real facts
+  const facts = [];
+  facts.push(`In ${data.n}, residents have a composite equity score of ${data.s}/100.`);
+  if (data.a === 'Poor')     facts.push("Air quality data shows elevated pollution levels that may increase baseline lung disease risk.");
+  if (data.a === 'Moderate') facts.push("Air quality is at a moderate level — worth monitoring for those with respiratory conditions.");
+  if (data.i !== 'Not available' && incVal < 40000) facts.push("Median household income suggests economic barriers to preventative care.");
+  if (data.u !== 'Not available' && parseFloat(data.u) > 15) facts.push("A high uninsured rate indicates significant gaps in healthcare access.");
+  if (data.p === 'Not available' || data.sm === 'Not available') facts.push("Some local health data is not yet published by the CDC/Census for this postal code — only confirmed data is shown.");
+  document.getElementById('eqNarrative').innerText = facts.join(" ");
+}
+
+// ============================================================
+// 9. AI CHATBOT — LungCoach Built-in Knowledge Engine
+// ============================================================
+let chatHistory = [];
+let _lastTopic  = null;
+let _topicCount = {};
+
+// ---- 200+ response knowledge base ----
+const KNOWLEDGE_BASE = {
+
+  greeting: {
+    patterns: [/^(hi+|hello|hey|good (morning|afternoon|evening)|howdy|what'?s up|yo\b|greetings|sup\b)/i, /^how are you/i, /^(good to meet|nice to meet)/i],
+    responses: [
+      "Hello! I'm LungCoach, your personal lung health guide. I can help you understand lung cancer risk, free screening options, insurance coverage, and quitting smoking. What's on your mind?",
+      "Hi there! Great to hear from you. Ask me anything about lung health — screening eligibility, what scans cost, how to talk to your doctor, or how to quit smoking. What would you like to know?",
+      "Hey! I'm LungCoach. I'm here to help with lung cancer risk, LDCT screening guidelines, insurance questions, and more. Where would you like to start?",
+      "Good to hear from you! I'm your lung health navigator. Whether you're wondering about your own risk, how much a scan costs, or how to access free care, I've got answers. What's on your mind?"
+    ]
+  },
+
+  what_is_lung_cancer: {
+    patterns: [/what is lung cancer/i, /tell me about lung cancer/i, /lung cancer (basics|overview|explained|information|info)/i, /what causes lung cancer/i, /how does lung cancer (start|develop|form|begin)/i],
+    responses: [
+      "Lung cancer occurs when cells in the lung grow uncontrollably, forming tumors that can spread to other parts of the body. It's the #1 cancer killer in the US, responsible for more deaths than breast, colon, and prostate cancer combined. There are two main types: Non-Small Cell (NSCLC, ~85% of cases) and Small Cell (SCLC). The key fact: caught early, survival exceeds 80%. Caught late, it drops to about 20%.",
+      "Lung cancer is the uncontrolled growth of abnormal cells in one or both lungs. These cells don't do the work of normal lung cells and can form tumors that interfere with breathing and spread to other organs. Smoking causes about 85% of cases, but 15–20% of diagnoses are in people who never smoked — radon, asbestos, and air pollution are other major causes.",
+      "There are two primary categories of lung cancer: Non-Small Cell Lung Cancer (NSCLC) — which includes adenocarcinoma, squamous cell, and large cell — and Small Cell Lung Cancer (SCLC), which is rarer but more aggressive. Early-stage lung cancer is often completely curable with surgery. This is why the LungIQ risk assessment and annual LDCT screening exist — to catch it before it spreads. Please consult your doctor for any personal health concerns.",
+      "Lung cancer starts when DNA damage causes lung cells to grow out of control. Risk builds over years of exposure to carcinogens like cigarette smoke, radon, or asbestos. The tragedy is that it rarely causes symptoms until advanced stages — which is exactly why proactive screening is so important for high-risk people. The good news is that treatment options have improved dramatically, especially for early-stage cancers."
+    ]
+  },
+
+  screening: {
+    patterns: [/screen(ing)?/i, /ldct|low.?dose|ct scan|lung scan/i, /annual scan|yearly scan/i, /get tested|get scanned|get checked/i, /should i (get|have) a scan/i, /do i need a scan/i, /when (should|do) i (get|have|need)/i],
+    responses: [
+      "LDCT (Low-Dose CT) lung screening is a quick, painless 10-minute scan that can detect lung cancer at its earliest and most treatable stage — often before any symptoms appear. The USPSTF recommends it annually for adults aged 50–80 who are current or former smokers with at least 20 pack-years of history. Ask your doctor for a written order and you're on your way. I'm not a medical professional, so always confirm with your healthcare provider.",
+      "Annual low-dose CT screening is the gold standard for early lung cancer detection — catching it when it's 80% survivable versus only 20% if found late. You may qualify if you're 50–80 years old, a current or former smoker, and have smoked 20+ pack-years. The scan itself uses very low radiation — about the same as a cross-country flight. Talk to your doctor to confirm eligibility.",
+      "The entire point of LDCT screening is to find cancer before you feel anything. The National Lung Screening Trial (the largest study ever done) proved that annual CT screening reduces lung cancer deaths by 20% in high-risk individuals. That's thousands of lives saved per year. If you think you might qualify, use the Assess Risk tab to calculate your score, then bring it to your doctor.",
+      "LDCT screening takes about 10 minutes, requires no needles or dye, and you don't need to hold your breath for long. Most qualified patients pay $0 out of pocket. The scan produces a detailed image of your lungs that a radiologist reviews for any nodules or abnormalities. If something is found, it usually requires follow-up imaging — most findings turn out to be benign. But catching a real tumor early is life-saving.",
+      "Annual screening is recommended — not just once. Lung cancer can develop or grow between scans, so consistency matters. Think of it like an annual mammogram or colonoscopy: a routine that protects your health over time. Once you've had your first scan, your doctor will tell you whether to come back in 1 year or sooner based on your results. Please consult your physician about your specific situation."
+    ]
+  },
+
+  eligibility: {
+    patterns: [/elig(ible|ibility)/i, /qualif(y|ies|ied|ication)/i, /do i (meet|qualify|fit) (the )?criteria/i, /am i eligible/i, /uspstf/i, /guidelines/i, /who (qualifies|should get|needs)/i, /requirements? for/i],
+    responses: [
+      "USPSTF 2021 guidelines say you qualify for free annual lung screening if: (1) you're age 50–80, (2) you're a current smoker OR a former smoker who quit within the last 15 years, and (3) you have a 20+ pack-year history. Pack-years = (cigarettes per day ÷ 20) × years smoked. Use the Assess Risk tab to calculate yours! Always confirm eligibility directly with your doctor.",
+      "Three boxes to check for USPSTF-recommended screening: age 50–80 ✓, 20+ pack-years of smoking ✓, and current smoker or quit within 15 years ✓. If all three apply to you, your insurance must cover the scan at zero cost. Non-smokers generally don't qualify for routine LDCT, but should talk to their doctor if they have COPD, heavy radon exposure, or a strong family history.",
+      "The 2021 USPSTF update expanded eligibility — it lowered the starting age from 55 to 50 and reduced the pack-year requirement from 30 to 20. This means millions more people now qualify who didn't before. If you were told you didn't qualify under the old rules, it's worth checking again. Some doctors aren't yet up to date on the 2021 changes.",
+      "Even if you don't meet USPSTF criteria, your doctor may still recommend screening based on other factors — like COPD, occupational exposures, or family history. These are called 'off-guideline' or 'individualized' recommendations. Criteria exist for insurance coverage purposes, but your doctor always has clinical judgment. If you're concerned about your lung health, have that conversation regardless of whether you technically 'qualify.'"
+    ]
+  },
+
+  cost: {
+    patterns: [/cost|price|expensive|afford|pay|bill|free|cheap|how much|out.of.pocket|copay|co-pay|deductible/i, /will (i|my insurance) (pay|cover|be charged)/i, /is (it|screening|the scan) (free|covered|paid)/i],
+    responses: [
+      "The cost depends on your insurance: Medicare covers LDCT 100% for eligible patients (ages 50–77, 20+ pack-years, written physician order). Medicaid covers it at zero cost in all 50 states for eligible beneficiaries. Most private/employer plans must cover it at $0 copay under the ACA as a preventive service. If you're uninsured, Federally Qualified Health Centers (FQHCs) offer sliding-scale fees — many charge $0. See our Financial Navigator tab for exact details.",
+      "For most qualifying patients, lung screening is completely free. Under the ACA, private insurers must cover preventive LDCT at no cost-sharing. Medicare Part B covers it 100% for ages 50–77 with 20+ pack-years. Medicaid covers eligible enrollees at no cost. Without insurance, community health centers and FQHCs serve patients regardless of ability to pay.",
+      "Don't let fear of a bill stop you from being screened. Here's the breakdown by insurance: Private insurance (ACA-compliant) → $0 copay. Medicare → $0 for eligible patients with a written order. Medicaid → $0 for eligible enrollees. Uninsured → sliding-scale FQHCs, free community clinics, or hospital financial assistance programs. The Financial Navigator tab in this app breaks it down further.",
+      "A low-dose CT scan without insurance can cost $200–$1,000 at a standard imaging center. But you have options: FQHCs charge on a sliding scale based on income, often $0–$40. Many hospital systems offer financial assistance programs that cover 100% of costs for low-income patients. The American Cancer Society's Cancer Action Network also maintains a list of free screening programs by state.",
+      "One important nuance: even with insurance, make sure to get a written physician order before your scan. Some insurers require this to classify it as preventive (and therefore $0 cost). Without that order, the scan might be billed as diagnostic, which could trigger a copay or deductible. A quick call to your doctor's office or a patient portal message can get you that order easily."
+    ]
+  },
+
+  medicare: {
+    patterns: [/medicare/i, /part (a|b|d)/i, /medicare (advantage|supplement|medigap)/i, /over 65|senior (insurance|coverage)/i],
+    responses: [
+      "Medicare Part B covers annual LDCT lung screening at 100% — no copay, no deductible — for beneficiaries ages 50–77 who are current or former smokers with 20+ pack-years and have a written physician order. You must also have received lung cancer screening counseling. Make sure your imaging center is Medicare-certified to ensure full coverage.",
+      "Medicare covers LDCT screening but there are a few requirements: your doctor must provide a written order, you must be ages 50–77, have 20+ pack-years, and be a current smoker or have quit within the last 15 years. Medicare Advantage (Part C) plans are also required to cover this benefit. If you're on a Medicare Advantage plan, call your plan directly to confirm the process for scheduling.",
+      "Medicare's lung cancer screening benefit was expanded in 2022 to lower the age from 55 to 50, matching USPSTF 2021 guidelines. If you were previously told you were too young for Medicare-covered screening, that may have changed. There is no cost-sharing for this preventive benefit when all eligibility criteria are met and the facility accepts Medicare assignment. Ask your doctor to write the order today."
+    ]
+  },
+
+  medicaid: {
+    patterns: [/medicaid/i, /chip|children.s health/i, /state (insurance|coverage|health plan)/i, /low.?income (insurance|coverage|health)/i, /medi-?cal/i],
+    responses: [
+      "Medicaid covers low-dose CT lung screening at zero cost for eligible enrollees in all 50 states. If you're on Medicaid, simply tell your primary care doctor you'd like to be screened for lung cancer — they'll determine if you meet the criteria and write the order. There should be no copay. If a provider tries to charge you, you have the right to dispute it.",
+      "Under the ACA's preventive services mandate, Medicaid must cover LDCT screening for eligible patients at no cost-sharing. This includes Medicaid expansion enrollees. If you're unsure whether your specific Medicaid plan covers it, call the member services number on the back of your card and ask specifically about 'preventive lung cancer screening with LDCT.' They are required to cover it.",
+      "Medicaid members also have access to the NEMT (Non-Emergency Medical Transportation) benefit, which provides free rides to medical appointments including screening. So if cost AND getting there are both concerns, Medicaid covers both. Ask your care coordinator or call your plan to set up transportation to your screening appointment."
+    ]
+  },
+
+  private_insurance: {
+    patterns: [/private (insurance|plan|coverage)|employer (insurance|plan|coverage|sponsored)/i, /blue ?cross|aetna|cigna|united ?health|humana|anthem/i, /aca|affordable care act|marketplace plan|obamacare/i, /hmo|ppo|epo/i],
+    responses: [
+      "Under the ACA, all non-grandfathered private health plans must cover LDCT lung screening at zero cost-sharing for eligible patients — meaning $0 copay and $0 deductible. This applies whether you're on an employer plan, an ACA marketplace plan, or most union plans. Call your insurer's member services to confirm the process and make sure you get a physician order before scheduling.",
+      "If you have a private insurance plan, LDCT screening is a covered preventive service at no out-of-pocket cost. The key is getting classified correctly: your doctor needs to write an order, and you should confirm the imaging center is in-network. Out-of-network facilities may bill differently. A quick call to your insurer before scheduling can prevent any billing surprises.",
+      "Grandfathered health plans (plans that haven't changed significantly since before the ACA) are exempt from the preventive services mandate. If you're on one of these older plans, coverage may not be guaranteed. Ask your HR department or insurer whether your specific plan is 'grandfathered.' If it is, you still have options — hospital financial assistance programs and FQHCs can fill the gap."
+    ]
+  },
+
+  uninsured: {
+    patterns: [/uninsured|no insurance|don.t have insurance|without insurance|self.?pay/i, /can.t afford|can't afford/i, /what if i (don.t have|have no) insurance/i],
+    responses: [
+      "Being uninsured doesn't mean you're out of options. Federally Qualified Health Centers (FQHCs) are federally funded clinics that serve patients regardless of insurance or ability to pay — they charge on a sliding scale based on income, and many charge $0. Find your nearest one at findahealthcenter.hrsa.gov. Many offer lung cancer screening on-site or through referral partnerships.",
+      "If you're uninsured, first check whether you qualify for Medicaid — eligibility expanded under the ACA, and in most states covers adults up to 138% of the federal poverty level. If you don't qualify, community health centers, hospital charity care programs, and free clinic networks are your best options. Some hospital systems will write off the entire cost of a scan for uninsured patients who apply for financial assistance.",
+      "Don't let lack of insurance be the reason you skip screening. The HRSA Health Center Program funds over 1,400 locations nationwide that provide care on a sliding-scale fee. Additionally, the American Lung Association runs a helpline (1-800-LUNGUSA) that can connect you to local free or low-cost screening programs. You deserve access to preventive care regardless of your insurance status."
+    ]
+  },
+
+  quitting: {
+    patterns: [/quit(ting)?|stop smoking|cessation|nicotine|patch|gum|lozenge|varenicline|chantix|champix|wellbutrin|bupropion/i, /give up smoking|kick the habit|want to stop|trying to quit/i, /how (do i|can i|to) quit/i, /smok(ing|er) and want/i],
+    responses: [
+      "Quitting smoking is the single most powerful thing you can do for your lung health — your risk starts dropping within hours of your last cigarette. The free national quitline is 1-800-QUIT-NOW (1-800-784-8669). They'll mail you free nicotine patches, connect you with a counselor, and build a personalized quit plan. Most state Medicaid programs also cover prescription cessation medications like varenicline at no cost.",
+      "Combining medication with counseling doubles your quit success rate versus willpower alone. FDA-approved options include nicotine replacement therapy (patches, gum, lozenges, inhaler, nasal spray), varenicline (Chantix), and bupropion (Wellbutrin). Talk to your doctor about which is right for you — many are covered at $0 under ACA preventive care benefits. Call 1-800-QUIT-NOW for free support starting today.",
+      "Every smoke-free day counts — within 5 years of quitting, your lung cancer risk can drop by nearly 50%. Start with the free National Cancer Institute Smokefree program at smokefree.gov, or text QUIT to 47848 for text-based coaching. The 1-800-QUIT-NOW line offers free patches, lozenges, and counseling in both English and Spanish. If you've tried before, that experience makes your next attempt more likely to succeed.",
+      "Nicotine is one of the most addictive substances known, so don't feel ashamed if you've tried to quit before. The average successful quitter tries 8–10 times before it sticks. Each attempt teaches you something. The most effective approach combines medication (like nicotine patches) with behavioral support (like quitline coaching or group therapy). Your doctor can prescribe quit aids and many are free under your insurance.",
+      "If you're worried that quitting will cause weight gain or increase stress, those are real concerns worth addressing with your doctor. But the lung cancer risk reduction from quitting far outweighs these side effects. Some programs specifically address these concerns. Text-based quit programs like SmokefreeTXT (text QUIT to 47848) are discreet and convenient. You've got this — one day at a time."
+    ]
+  },
+
+  vaping: {
+    patterns: [/vap(ing|e|or)|e.?cig(arette)?|juul|pod (system|device)/i, /electronic cigarette/i, /is vaping (safe|bad|worse|better|dangerous)/i],
+    responses: [
+      "Vaping is not a safe alternative to smoking, and it's not an FDA-approved quit method. E-cigarettes deliver nicotine (which is highly addictive) and heat chemicals that can damage lung tissue. EVALI (e-cigarette or vaping product use-associated lung injury) is a serious and sometimes fatal condition that has affected thousands. If you're using vaping to try to quit cigarettes, talk to your doctor about evidence-based cessation options instead.",
+      "The long-term effects of vaping are still being studied, but we know it causes lung inflammation and damage. For people who already have lung cancer risk factors (like a smoking history), adding vaping to the mix is especially concerning. The best path forward is to work with your doctor or call 1-800-QUIT-NOW to develop a quit plan that addresses both cigarettes and e-cigarettes.",
+      "Some people use e-cigarettes as a stepping stone to quitting traditional cigarettes — but the evidence for this approach is mixed, and most health organizations recommend against it as a cessation strategy. If you currently vape, it's worth discussing with your doctor whether you meet criteria for lung screening, since prior combustible tobacco use still counts toward your pack-year total even if you now only vape."
+    ]
+  },
+
+  marijuana: {
+    patterns: [/marijuana|cannabis|weed|pot\b|joint\b|blunt\b|thc|cbd smoke/i, /smoking weed|smoking cannabis/i, /does (weed|marijuana|cannabis) cause/i],
+    responses: [
+      "Research on marijuana smoke and lung cancer risk is less conclusive than for cigarette smoke, but smoking anything produces combustion byproducts that can damage lung tissue. Regular marijuana smokers do show higher rates of bronchitis and airway inflammation. For lung screening eligibility purposes, marijuana smoking does not count toward the pack-year calculation used by USPSTF guidelines, which is based specifically on cigarette use.",
+      "Smoking marijuana does expose your lungs to many of the same carcinogens found in cigarette smoke, though people typically smoke much less marijuana by volume. The risk relationship is harder to study because many marijuana users also smoke cigarettes. If you have concerns about your lung health and use marijuana, speak with your doctor — they can assess your overall respiratory health without judgment."
+    ]
+  },
+
+  risk_factors: {
+    patterns: [/risk factor/i, /what (causes|increases|affects|raises) (lung cancer|my risk|risk)/i, /what are the risk/i, /what (puts me|makes me) at (risk|higher risk)/i, /what increases/i],
+    responses: [
+      "The major risk factors for lung cancer are: smoking (responsible for ~85% of cases), COPD or emphysema, prior lung cancer or other cancer history, family history of lung cancer, age over 50, and occupational/environmental exposures like radon gas, asbestos, and air pollution. The PLCOm2012 model in this app weighs all of these together for a clinically validated score.",
+      "Beyond smoking, key risk factors include: radon gas exposure in the home (the #2 cause of lung cancer — test your basement with a $20 kit), occupational asbestos or silica exposure, COPD (which doubles your risk), family history in a first-degree relative, prior radiation therapy to the chest, and chronic lung infections. About 15–20% of lung cancers occur in people who have never smoked.",
+      "Risk isn't a single yes/no — it's a spectrum shaped by many overlapping factors. The PLCOm2012 model accounts for age, BMI, education, smoking history, COPD, cancer history, and family history simultaneously. Someone with mild smoking history but COPD and a parent who had lung cancer may have a higher risk score than a heavier smoker with no other factors. That's why the full assessment matters.",
+      "Environmental and occupational factors are underappreciated risk contributors. Workers in mining, construction, roofing, and certain manufacturing industries face elevated exposure to asbestos, silica, diesel exhaust, and other carcinogens. If you've worked in these fields, mention it to your doctor when discussing lung health. Radon is also a concern for anyone in a basement-level home, especially in the Midwest and Northeast."
+    ]
+  },
+
+  copd: {
+    patterns: [/copd|emphysema|chronic bronchitis|chronic obstructive/i, /lung disease/i, /breathing (problem|issue|difficulty|trouble)/i, /short(ness)? of breath/i, /inhaler/i],
+    responses: [
+      "COPD (Chronic Obstructive Pulmonary Disease) is both a risk factor for lung cancer and a common comorbidity in smokers. Having a COPD diagnosis approximately doubles your lung cancer risk compared to a smoker without COPD. If you have COPD and meet other USPSTF criteria (age 50–80, 20+ pack-years), you should absolutely discuss LDCT screening with your pulmonologist or primary care doctor.",
+      "COPD and lung cancer are linked both through shared risk factors (primarily smoking) and through biological mechanisms — chronic inflammation in COPD-damaged lung tissue may promote cancer development. Many COPD patients don't realize they also qualify for lung cancer screening. If you're managing COPD, bring up screening at your next pulmonology appointment. It's often covered at $0 alongside your regular COPD care.",
+      "If you've been diagnosed with COPD, emphysema, or chronic bronchitis, your lung health is already under some form of medical management — which is a great foundation for also pursuing lung cancer screening. Your pulmonologist or respiratory care team can order the LDCT as part of your routine care. Early lung cancer detection in COPD patients is especially important because surgery or treatment options may be more limited if cancer is found at a late stage."
+    ]
+  },
+
+  family_history: {
+    patterns: [/family (history|member|hist)/i, /parent|sibling|brother|sister|father|mother|grandparent/i, /hereditary|genetic (risk|factor)/i, /runs in (my )?family/i, /my (mom|dad|parent|brother|sister|relative) (had|has|died from)/i],
+    responses: [
+      "Having a first-degree relative (parent, sibling, or child) who had lung cancer increases your own risk by approximately 50–80% compared to someone without that family history. The PLCOm2012 model specifically accounts for this. If you have a family history of lung cancer, make sure to mention it to your doctor — it may affect screening recommendations and could bump your risk score into a higher category.",
+      "Lung cancer does have a hereditary component, though genetics plays a smaller role than in some other cancers. What often runs in families is a combination of genetic susceptibility AND shared environmental factors (like a household with a heavy smoker). If multiple family members have had lung cancer, especially at younger ages, ask your doctor about genetic counseling. Some centers offer enhanced surveillance for people with strong family histories.",
+      "Family history of lung cancer is one of the variables in the PLCOm2012 clinical model used by LungIQ. It's weighted in your risk score along with your own smoking history, age, and other factors. Even if you've never smoked, a strong family history combined with other risk factors like COPD or radon exposure could put you at a meaningful risk level. Talk to your doctor about your complete risk picture."
+    ]
+  },
+
+  symptoms: {
+    patterns: [/symptom|sign(s)?|cough(ing)?|wheez|blood|chest (pain|pressure|tightness)|hoarse|weight loss|fatigue|losing weight|spit(ting)? up/i, /what (to look for|are signs)/i, /how do i know if i have/i, /is (this|my) cough/i],
+    responses: [
+      "Early-stage lung cancer often has NO symptoms — which is exactly why screening matters. When symptoms do appear, they can include: a persistent cough that doesn't go away, coughing up blood, chest pain or tightness, unexplained weight loss, hoarseness, recurring pneumonia or bronchitis, and shortness of breath. These symptoms are not specific to lung cancer, but if you're experiencing them persistently, please see a doctor promptly.",
+      "The dangerous truth about lung cancer is that it's often completely silent until advanced stages. By the time most people notice symptoms, the cancer has often spread — which is why Stage IV survival rates are so low. Warning signs worth a doctor visit include: new or worsening cough lasting more than 3 weeks, blood in sputum, unexplained fatigue or weight loss, and recurring chest infections. If you're in a high-risk group, don't wait for symptoms — get screened proactively.",
+      "Symptoms associated with lung cancer include persistent cough, coughing up blood or rust-colored sputum, chest pain that worsens with deep breathing, hoarseness, loss of appetite, unexplained weight loss, shortness of breath, recurring infections like bronchitis or pneumonia, and new onset of wheezing. Many of these overlap with COPD, asthma, and other conditions. A doctor can order imaging to determine the cause. Please see a physician — this is not something to self-diagnose.",
+      "A cough that persists for more than 3 weeks — especially in a smoker or former smoker — should always be evaluated by a doctor. It's most often caused by post-nasal drip, acid reflux, or a respiratory infection. But a small percentage of persistent coughs are early indicators of lung cancer. The only way to know is with proper evaluation. Don't panic, but don't ignore it either."
+    ]
+  },
+
+  radon: {
+    patterns: [/radon/i, /test my (home|house|basement)/i, /radioactive gas/i, /basement (gas|test|radon)/i, /how do i test/i],
+    responses: [
+      "Radon is a colorless, odorless radioactive gas that forms from naturally decaying uranium in soil and rock. It seeps into homes through cracks in foundations and is the #2 cause of lung cancer in the US — responsible for about 21,000 deaths per year. You can test your home with an inexpensive short-term kit (under $20) from any hardware store like Home Depot or Lowe's. If levels exceed 4 pCi/L, a mitigation system (typically $800–$2,500) can reduce them by up to 99%.",
+      "Testing for radon is one of the most impactful lung health actions you can take, especially if you live in a basement-level home or in the Midwest or Northeast. Leave a short-term test kit in your lowest livable floor for 48–96 hours, then mail it in for lab analysis. Results come back within 2 weeks. The EPA recommends fixing your home if radon levels exceed 4 pCi/L — mitigation is very effective and permanent.",
+      "The EPA estimates that 1 in 15 American homes has elevated radon levels. Radon risk is especially high in states like Iowa, Minnesota, South Dakota, Pennsylvania, and parts of the Midwest. If you're a current or former smoker AND have elevated home radon, your combined risk is significantly higher than either factor alone — radon and tobacco smoke act synergistically. Testing your home is a $20 investment that could save your life."
+    ]
+  },
+
+  asbestos: {
+    patterns: [/asbestos/i, /mesothelioma/i, /occupational (exposure|risk|cancer)/i, /work(ed|ing) (with|around|in) (asbestos|chemicals|dust|fibers)/i],
+    responses: [
+      "Asbestos exposure is a serious lung cancer risk factor, particularly for workers in construction, shipbuilding, insulation, mining, and older building renovation. Asbestos fibers, when inhaled, embed permanently in lung tissue and can cause both lung cancer and mesothelioma (a cancer of the lung lining). The effects can take 20–50 years to manifest, which is why older workers from these industries should be especially vigilant about screening.",
+      "If you've had occupational asbestos exposure and also have a smoking history, your lung cancer risk is dramatically elevated — the two factors multiply rather than just add. Current USPSTF screening guidelines focus on smoking history, but many pulmonologists will recommend LDCT for heavily asbestos-exposed individuals regardless of smoking status. Bring your occupational history to your doctor when discussing screening eligibility."
+    ]
+  },
+
+  air_quality: {
+    patterns: [/air (quality|pollution|pollutant)|aqi/i, /smog|particulate|pm2\.?5|diesel|exhaust/i, /environmental (risk|factor|exposure)/i, /live (near|by|next to) (a highway|industry|factory|plant)/i],
+    responses: [
+      "Long-term exposure to air pollution — especially fine particulate matter (PM2.5) from vehicle exhaust, industrial emissions, and wildfire smoke — is a recognized lung cancer risk factor. The World Health Organization classifies outdoor air pollution as a Group 1 carcinogen. People who live near highways, industrial zones, or in high-pollution cities face elevated lifetime exposure. Our Equity Data tab shows the real-time AQI for any US zip code.",
+      "Air quality matters for lung health even if you've never smoked. Chronic exposure to elevated PM2.5 is associated with lung cancer, COPD, and cardiovascular disease. You can check your area's air quality at airnow.gov or via the EPA's AirNow app. On high-pollution days (AQI over 100), people with lung conditions should limit outdoor exertion. HEPA air purifiers can meaningfully reduce indoor particulate exposure.",
+      "Diesel exhaust is classified as a Group 1 carcinogen by the International Agency for Research on Cancer (IARC). People who work or live around heavy diesel traffic, construction equipment, or freight corridors face elevated lung cancer risk even without smoking. This is a recognized occupational and environmental health issue — if it applies to you, make sure to mention it to your doctor when discussing your overall lung health picture."
+    ]
+  },
+
+  never_smoker: {
+    patterns: [/never (smoked|smoker|smoke)|non.?smoker/i, /i don.t smoke|i haven.t smoked/i, /can (non.?smokers|people who never smoked) get (lung cancer)?/i, /lung cancer without smoking/i],
+    responses: [
+      "About 15–20% of people diagnosed with lung cancer have never smoked. In never-smokers, the main risk factors are radon gas exposure, secondhand smoke, occupational exposures (asbestos, diesel, silica), air pollution, and genetic factors. Lung cancer in never-smokers tends to be a different subtype (often adenocarcinoma) and may respond differently to treatment. If you've never smoked but have other risk factors, talk to your doctor.",
+      "The USPSTF screening guidelines specifically target smokers and former smokers because that's where the highest-risk population is. If you've never smoked and don't meet those criteria, you generally won't qualify for insurance-covered LDCT screening. But that doesn't mean you should be complacent — test your home for radon, maintain regular wellness visits, and be aware of respiratory symptoms. Your doctor may recommend individualized screening based on your specific history.",
+      "Never-smokers who develop lung cancer often have different driver mutations — EGFR, ALK, and ROS1 mutations are more common in this population — which actually respond well to newer targeted therapies. If you're a never-smoker diagnosed with lung cancer, make sure your oncologist orders comprehensive genomic profiling (sometimes called a 'lung cancer gene panel') to identify targeted treatment options."
+    ]
+  },
+
+  secondhand_smoke: {
+    patterns: [/second.?hand|passive (smoke|smoking)|lived with (a )?smoker|grew up (with|around) (a )?smoker|spouse (who )?smokes/i, /someone else.?s smoke|exposed to smoke/i],
+    responses: [
+      "Secondhand smoke is a proven lung carcinogen and is responsible for approximately 7,300 lung cancer deaths in the US each year among non-smokers. Living with a smoker increases your lung cancer risk by about 20–30%. Years of heavy secondhand smoke exposure may warrant a conversation with your doctor about whether individualized screening is appropriate, even if you personally never smoked.",
+      "The risk from secondhand smoke is dose-dependent — the more years of exposure and the closer you were to the smoke, the higher the risk. People who grew up in a household with heavy smokers, or whose spouse smoked for decades, have meaningfully elevated risk. While you likely won't qualify for standard USPSTF-criteria screening, you should factor this into your conversation with your doctor about overall lung health monitoring.",
+      "Secondhand smoke contains over 70 known carcinogens. Even brief exposure in enclosed spaces is harmful — but it's chronic, years-long exposure that significantly elevates cancer risk. If you have a household member who currently smokes, encouraging them to quit (or at minimum smoke only outdoors) is one of the most protective things you can do for your own lung health. The 1-800-QUIT-NOW quitline helps smokers and can also advise family members."
+    ]
+  },
+
+  plco_model: {
+    patterns: [/plco|plcom2012|clinical model|risk (model|algorithm|score|calculation)/i, /how (is|was|does) (my )?risk (calc|computed|determined|scored|work)/i, /how does (this|the) (app|tool|calculator|lungiq) work/i, /what (is|does) (this score|the model|plco) mean/i],
+    responses: [
+      "The PLCOm2012 model (published by Dr. Martin Tammemägi et al. in 2013) is the most validated clinical tool for predicting 6-year lung cancer risk. It weighs age, BMI, education level, smoking intensity and duration, time since quitting, COPD diagnosis, prior cancer history, and family history of lung cancer to produce a percentage probability. It was developed from data of over 80,000 participants in the PLCO Cancer Screening Trial.",
+      "LungIQ uses the PLCOm2012 model — the same algorithm deployed in hospital systems and cancer centers globally. It calculates your 6-year lung cancer risk by combining 10+ clinical variables. Risk thresholds: Low = under 1.3%, Moderate = 1.3–3.0%, High = over 3.0%. The USPSTF recommends screening for anyone over 1.3%. This is a statistical population tool — not a personal diagnosis — so always discuss results with your physician.",
+      "What makes PLCOm2012 powerful is that it captures interactions between risk factors, not just each factor in isolation. A 60-year-old former smoker with COPD and family history has a compounded risk that a simple pack-year calculator would underestimate. The model was validated across diverse populations and outperforms the older USPSTF pack-year-only criteria at identifying who will actually develop lung cancer.",
+      "Your 'Lung Age' shown in LungIQ results is a derived metric based on your PLCOm2012 risk score. It represents the age of a typical non-smoking person whose lung cancer risk matches yours. A lung age higher than your actual age signals elevated risk. A lung age lower than your actual age means your lungs are doing relatively well. It's a communication tool to help people understand their risk intuitively."
+    ]
+  },
+
+  lung_age: {
+    patterns: [/lung age/i, /what does lung age mean/i, /my (lungs are|lung age is)/i, /what is (my )?lung age/i],
+    responses: [
+      "Lung Age is a derived metric based on your PLCOm2012 risk score. It represents the chronological age of an average non-smoker whose lung cancer risk matches yours. For example, if you're 55 years old but your risk score equals that of an average 63-year-old non-smoker, your 'lung age' is 63. It's a way of making statistical risk feel more intuitive and personal.",
+      "If your lung age is higher than your actual age, it means your lungs have accumulated more risk than would be expected for someone your age with no history. If it's lower, your risk is actually below what's typical for your age group — which is good news. Think of it as a motivational number: for smokers, quitting can meaningfully reduce your lung age over time as your risk profile improves."
+    ]
+  },
+
+  pack_years: {
+    patterns: [/pack.?year/i, /how (many|much) (pack|smoked)|calculate (my )?(smoking|pack|history)/i, /what (is|are) pack.?years/i, /pack (history|count)/i],
+    responses: [
+      "Pack-years measure your lifetime smoking exposure. Formula: (cigarettes per day ÷ 20) × years smoked = pack-years. One pack a day for 20 years = 20 pack-years. Half a pack a day for 40 years = 20 pack-years. Two packs a day for 10 years = 20 pack-years. The USPSTF threshold for screening eligibility is 20+ pack-years. Our Assess Risk calculator computes this automatically from your inputs.",
+      "Your pack-year count doesn't reset when you quit — it's a cumulative measure of lifetime exposure. So a former smoker who quit 10 years ago still has their full pack-year total and still qualifies for screening if they meet other criteria. This is important: don't assume quitting means you no longer need to worry about screening eligibility. Former smokers remain eligible for up to 15 years after quitting.",
+      "Pack-years = (cigarettes per day / 20) × years smoked. Examples: 10 cigs/day × 40 years = 20 pack-years. 20 cigs/day × 20 years = 20 pack-years. 40 cigs/day × 10 years = 20 pack-years. Even 5 cigs/day × 40 years = 10 pack-years, which is below the threshold. The Assess Risk tab calculates this automatically. Always confirm your eligibility with your doctor."
+    ]
+  },
+
+  survival_rates: {
+    patterns: [/surviv(al|e)|prognos|outcome(s)?|stage (1|2|3|4|i|ii|iii|iv)|caught early|5.?year (rate|survival)|chances of (survival|living|beating)/i, /how (bad|serious|dangerous|fatal|deadly) is (lung cancer|it)/i, /can (lung cancer|it) be cured/i],
+    responses: [
+      "Survival rates vary dramatically by stage: Stage I (localized): ~80–92% 5-year survival. Stage II: ~50–60%. Stage III (regional spread): ~20–35%. Stage IV (metastatic): ~8%. This is exactly why early detection matters so much — LDCT screening shifts diagnoses toward Stage I, where the odds are far better. The National Lung Screening Trial showed a 20% reduction in lung cancer mortality with annual LDCT screening.",
+      "Lung cancer is the #1 cancer killer in the US, responsible for more deaths per year than breast, colon, and prostate cancer combined. But Stage I lung cancer, caught before it spreads, has a 5-year survival rate of over 80% — and many Stage I patients are effectively cured with surgery alone. The survival gap between early and late stage is bigger than almost any other cancer, which is why screening is so critical.",
+      "When lung cancer is caught at Stage I through screening, treatment often involves minimally invasive surgery (like VATS lobectomy) with no radiation or chemotherapy needed. Five-year survival at Stage I exceeds 80%. By Stage IV, surgery is rarely an option and treatment focuses on extending life and quality of life. The math is simple and compelling: get screened if you're eligible.",
+      "It's also worth knowing that treatment options for lung cancer have improved dramatically in the last decade. Targeted therapies (for tumors with specific mutations like EGFR or ALK) and immunotherapies (like checkpoint inhibitors) have significantly improved outcomes even in advanced-stage patients. But early detection remains the most powerful tool — no treatment works as well as catching cancer before it spreads."
+    ]
+  },
+
+  treatment: {
+    patterns: [/treatment(s)?|therapy|therapies|surgery|chemotherapy|chemo|radiation|immunotherapy|targeted therapy|clinical trial/i, /how (is|do they) treat (lung cancer)?/i, /what happens after (diagnosis|finding cancer)/i, /options (for|after)/i],
+    responses: [
+      "Treatment for lung cancer depends heavily on the type and stage. Early-stage non-small cell lung cancer (NSCLC) is often treated with surgery — minimally invasive techniques like VATS (video-assisted thoracoscopic surgery) have shorter recovery times than traditional open surgery. Stage II and III may involve combinations of surgery, radiation, and chemotherapy. Stage IV treatment focuses on targeted therapies, immunotherapy, and clinical trials.",
+      "The treatment landscape for lung cancer has changed dramatically. Targeted therapies for specific mutations (EGFR, ALK, ROS1, KRAS) can be highly effective and are taken as daily pills rather than IV chemotherapy. Immunotherapies like pembrolizumab (Keytruda) have transformed outcomes for certain patients. If you or someone you know has been diagnosed, make sure comprehensive genomic profiling of the tumor is done — it determines which targeted options may apply.",
+      "After a lung cancer diagnosis, you'll likely be referred to a multidisciplinary team including a thoracic surgeon, medical oncologist, radiation oncologist, and pulmonologist. Major cancer centers (NCI-designated) tend to have the most experience with lung cancer and access to clinical trials. The American Cancer Society's Cancer Information Helpline (1-800-227-2345) can help you find specialized care and navigate next steps."
+    ]
+  },
+
+  scan_process: {
+    patterns: [/what (happens|is it like|to expect) (during|at|for) (a |the )?(scan|screening|ldct|ct)/i, /how (long|does) (does|a) (the )?(scan|screening|ldct|ct) (take|work|last)/i, /what do (they|i) do (at|during) (the )?(scan|screening)/i, /is (the scan|ldct|screening) (painful|scary|uncomfortable)/i, /prepare? for (a |the )?(scan|screening|ldct)/i],
+    responses: [
+      "A low-dose CT scan is quick and completely painless — most people say it's much easier than they expected. You lie on a table, the table slides through a large donut-shaped machine, and you're asked to hold your breath for about 5–10 seconds while the scan is taken. The whole procedure takes about 10 minutes. There are no needles, no contrast dye, and no claustrophobia-inducing tunnel. You can drive yourself home.",
+      "To prepare for an LDCT scan: wear comfortable, loose clothing without metal (you may be asked to change into a gown). Avoid wearing jewelry. You generally don't need to fast beforehand. Arrive a few minutes early to complete intake paperwork. The radiation dose is low — roughly equivalent to a cross-country flight. Results are typically reviewed by a radiologist and sent to your doctor within a few days.",
+      "The scan produces hundreds of detailed cross-sectional images of your lungs that a radiologist reviews for any abnormalities. Most findings (like small nodules) are benign and just require a follow-up scan in 6–12 months to make sure they're not growing. A small percentage of findings require further workup like a PET scan or biopsy. Your doctor will guide you through next steps based on your specific results — try not to let fear of what might be found prevent you from going."
+    ]
+  },
+
+  false_positives: {
+    patterns: [/false (positive|alarm)|nodule|incidental (finding|nodule)|worry|scared (of results|of the scan)/i, /what if (they find|something is found|it shows)/i, /what does a nodule mean/i],
+    responses: [
+      "Finding a pulmonary nodule on a CT scan is very common and usually not cancer. In fact, about 96% of lung nodules found on screening scans turn out to be benign — scar tissue from past infections, calcified lymph nodes, or small benign growths. When a nodule is found, the standard approach is to monitor it with follow-up scans over 1–2 years to confirm it's not growing. Only a small fraction require biopsy.",
+      "False positives are a known limitation of lung cancer screening — about 1 in 4 first-time LDCT scans shows something that requires follow-up. This can cause anxiety, and additional imaging or procedures have costs and risks. But multiple studies show the survival benefit of catching real cancers early significantly outweighs the harm from false positives. Your doctor will put any finding in clinical context and guide next steps."
+    ]
+  },
+
+  follow_up: {
+    patterns: [/follow.?up (scan|appointment|imaging)|after (the scan|screening|ldct)|next steps after|what (next|happens next|if results are)/i, /my scan (showed|found|came back)|results (came back|showed)/i],
+    responses: [
+      "If your screening scan shows no concerning findings, you'll typically be recommended for a repeat scan in 12 months. If a small nodule is found, your radiologist will categorize it using Lung-RADS (a standardized reporting system) and recommend an appropriate follow-up interval — usually 3 or 6 months for low-suspicion nodules, or further workup for higher-suspicion ones. Your doctor will walk you through what the specific finding means for you.",
+      "The Lung-RADS scoring system (1–4) is used to classify screening results: 1 = negative (repeat in 1 year). 2 = benign finding (repeat in 1 year). 3 = probably benign but needs 6-month follow-up. 4 = suspicious, needs additional workup (PET scan, biopsy, or surgical evaluation). Most first-time screeners get a 1 or 2. If you get a 3 or 4, it doesn't mean you have cancer — it means your doctor needs more information."
+    ]
+  },
+
+  find_center: {
+    patterns: [/find (a |the )?(screening center|clinic|hospital|facility|place)/i, /where (can i|do i|to) (get|have|do|find) (a )?(scan|screening|ldct)/i, /nearest (screening|clinic|hospital)/i, /how (do i|to) (schedule|book|make) (an )?(appointment|scan)/i, /where (is|are) (free|local) (clinics?|centers?)/i],
+    responses: [
+      "To find a certified lung cancer screening center near you, visit the American College of Radiology's Lung Cancer Screening Center registry at ACR.org/LCS. You can search by zip code for ACR-designated centers that meet quality standards. You can also ask your primary care doctor for a referral — they usually have preferred imaging centers in the area that accept your insurance.",
+      "Most major hospital systems and independent radiology centers offer LDCT lung screening. When calling to schedule, say specifically: 'I'd like to schedule a low-dose CT lung cancer screening — I have a physician order.' This ensures they book you into the preventive screening protocol (which is billed at $0 for eligible patients) rather than a diagnostic CT. Having your insurance card and physician order ready will streamline the process.",
+      "For uninsured patients or those in underserved areas, the HRSA Health Center Finder (findahealthcenter.hrsa.gov) can locate nearby federally qualified health centers that offer screening services or referrals. Some hospital systems run mobile screening units that travel to underserved zip codes — contact your local hospital's community health department to ask about upcoming screening events in your area."
+    ]
+  },
+
+  transportation: {
+    patterns: [/transport(ation)?|ride|drive|get there|nemt|no (car|ride)|getting to/i, /how do i get to/i, /can.t (drive|get a ride|afford a ride)/i],
+    responses: [
+      "Transportation is a real and recognized barrier to care — and there's help available. If you're on Medicaid, you qualify for NEMT (Non-Emergency Medical Transportation), which provides free round-trip rides to medical appointments including screening. Call your Medicaid managed care plan (the number on the back of your Medicaid card) and ask for 'an NEMT ride to a medical appointment.' They're required to provide it.",
+      "Options for transportation to a screening appointment: Medicaid NEMT (free for Medicaid members), Uber Health and Lyft Healthcare (some hospital systems have accounts that cover rides for patients), hospital social work departments (call the hospital and ask for social work — they often coordinate free rides), and local nonprofit volunteer driver programs through churches or community organizations.",
+      "If you're worried about transportation, contact the screening center directly and say 'I need help with transportation to get to my appointment.' Hospital patient navigators hear this frequently and usually have a solution ready. Many cancer centers have dedicated patient navigator programs specifically to remove barriers like transportation, childcare, and language. You don't have to figure this out alone."
+    ]
+  },
+
+  fqhc_clinics: {
+    patterns: [/fqhc|federally qualified|community health center|free clinic|sliding scale|sliding.?fee/i, /where (can i|to) get (free|low.?cost) (care|screening|help)/i, /low.?cost (option|care|health)/i],
+    responses: [
+      "Federally Qualified Health Centers (FQHCs) are community health clinics funded by the federal government to serve underserved populations. They provide comprehensive primary care, and many offer lung cancer screening services or referrals. Critically, they charge on a sliding-scale based on income — so if you have no income, the cost is $0. Find your nearest FQHC at findahealthcenter.hrsa.gov.",
+      "FQHCs are required by law to provide care to all patients regardless of their ability to pay. They cannot turn you away. Services typically include primary care, preventive screenings, chronic disease management, dental, mental health, and pharmacy services. For lung cancer screening specifically, they can order the LDCT referral, coordinate with imaging centers, and help with follow-up care.",
+      "Beyond FQHCs, free clinic networks exist in most major cities. The National Association of Free & Charitable Clinics (NAFC) maintains a directory at nafcclinics.org. Additionally, many hospital systems have financial assistance programs ('charity care') that can cover 100% of screening costs for income-qualifying patients — even at major academic medical centers. Ask the billing department about financial assistance before assuming you can't afford care."
+    ]
+  },
+
+  doctor_talk: {
+    patterns: [/doctor|physician|provider|primary care|pcp|how (do i|to) (talk|ask|bring it up|mention)/i, /what (do i|should i) (say|tell|ask) (my doctor|them)?/i, /my doctor (won.t|doesn.t|isn.t|hasn.t)/i, /how to (approach|start) (the )?conversation/i],
+    responses: [
+      "When you see your doctor, try saying: 'I've been reading about lung cancer screening and I believe I meet USPSTF 2021 criteria based on my age and smoking history. I'd like to discuss getting a written order for an annual low-dose CT scan.' Doctors respond well to specific, informed requests. You can also bring your LungIQ results as a conversation starter.",
+      "The key phrase to use is: 'I'd like a written order for annual low-dose CT lung screening. I meet USPSTF 2021 criteria.' A written physician order is required for Medicare coverage and most insurance plans. If your doctor is unfamiliar with the 2021 guidelines (which lowered the age from 55 to 50), politely mention that and offer to share the guidelines. You are your own best advocate.",
+      "If your doctor dismisses your concerns about lung health, it's completely okay to ask for a second opinion or a referral to a pulmonologist. Some primary care doctors are not up to date on the 2021 USPSTF guideline changes. You can also contact your insurance company directly to find out your coverage and ask them to send you information about lung screening benefits — sometimes coming from the insurer's direction helps move the conversation forward.",
+      "For the appointment, bring: your LungIQ risk results, a note about your smoking history (years smoked, cigarettes per day, when you quit), any relevant medical history (COPD, prior cancer, family history), and your insurance card. Ask your doctor: 'Do I qualify for lung cancer screening under USPSTF 2021 guidelines?' and 'Will you write the order today?' Keep the conversation focused and specific."
+    ]
+  },
+
+  financial_assistance: {
+    patterns: [/financial (assistance|aid|help|support)|cannot afford|can.?t afford|money|grant|charity|free (help|program|resource)/i, /help (paying|with costs|with bills)/i, /assistance program/i],
+    responses: [
+      "Several organizations offer financial assistance for lung cancer screening and treatment: The American Cancer Society (1-800-227-2345) can connect you to local resources. The Lung Cancer Research Foundation and GO2 Foundation for Lung Cancer offer patient support resources. Hospital financial assistance programs (charity care) can cover 100% of costs for income-qualifying patients — always ask before assuming you can't afford care.",
+      "If you're facing financial barriers to screening, here's a checklist of options: (1) Apply for Medicaid if you don't have insurance — many people qualify and don't know it. (2) Ask your hospital's billing department about financial assistance/charity care. (3) Contact an FQHC — they serve all patients regardless of ability to pay. (4) Call the American Cancer Society at 1-800-227-2345 for personalized resource navigation. (5) Check if your state has a lung cancer early detection program.",
+      "The Patient Advocate Foundation (patientadvocate.org) and NeedyMeds (needymeds.org) are two excellent resources for navigating financial assistance for cancer screening and treatment. Many pharmaceutical companies also offer assistance programs if treatment is needed. Don't let the cost of screening — or fear of future treatment costs — prevent you from taking this step. Early detection almost always means lower total treatment costs too."
+    ]
+  },
+
+  state_quitlines: {
+    patterns: [/quitline|quit line|free (quit|cessation|stop smoking) (program|help|support)/i, /1.800.quit/i, /state (quit|cessation|smoking) (program|resource)/i],
+    responses: [
+      "Every US state has a free quitline, all reachable through the national number 1-800-QUIT-NOW (1-800-784-8669). Services include free coaching calls, text-based support, and free nicotine replacement therapy (patches, gum, or lozenges) mailed directly to your home. Spanish-language support is available at 1-855-DÉJELO-YA. These services are available 24/7 and completely confidential.",
+      "State quitlines are remarkably effective and completely free. Studies show people who use a quitline are 2–3 times more likely to successfully quit than those who try alone. They offer personalized quit plans, support through cravings and relapse, and free NRT. Text QUIT to 47848 to start a text-based program. For online support, smokefree.gov offers interactive tools, a quit guide, and a community forum."
+    ]
+  },
+
+  emotional_support: {
+    patterns: [/scared|afraid|fear|anxious|anxiety|worried|nervous|stress(ed)?|overwhelm(ed)?|don.t know what to do/i, /what if (i have|it.s) cancer/i, /cancer diagnosis|just found out|recently diagnosed/i, /dealing with (a )?diagnosis/i, /can.t stop thinking/i],
+    responses: [
+      "It's completely normal to feel scared, anxious, or overwhelmed when thinking about lung cancer — whether you're waiting for results or recently received a diagnosis. Those feelings are valid. If you've received a diagnosis, connecting with a patient navigator or social worker at your cancer center can be enormously helpful. The American Cancer Society (1-800-227-2345) also offers 24/7 emotional support and can connect you with peer support groups.",
+      "Fear is one of the biggest reasons people delay or avoid screening — and it's one of the most understandable. But the peace of mind of a clear scan, or the life-saving power of catching something early, is worth working through that fear. Many cancer centers have patient navigators specifically trained to help with anxiety around screening. You don't have to do this alone, and taking the step to get screened is an act of self-care, not something to be afraid of.",
+      "If you or a loved one is facing a lung cancer diagnosis, remember: you are not a statistic. Outcomes vary enormously based on stage, specific tumor characteristics, overall health, and access to specialized care. Connecting with a thoracic oncologist at a major cancer center, getting comprehensive genomic profiling done on the tumor, and building a support network are all important next steps. The GO2 Foundation for Lung Cancer (go2foundation.org) is an excellent starting point for patient support resources."
+    ]
+  },
+
+  diet_exercise: {
+    patterns: [/diet|eat(ing)?|food|nutrition|exercise|physical activity|weight|healthy (habit|lifestyle|living)/i, /can (diet|exercise|food|eating) (help|reduce|lower|prevent)/i, /what (should i eat|can i do) to (help|protect|reduce)/i],
+    responses: [
+      "While no diet or exercise routine can undo the effects of smoking, maintaining a healthy lifestyle does support overall lung health and immune function. A diet rich in fruits and vegetables (especially cruciferous vegetables like broccoli and Brussels sprouts) provides antioxidants that may help protect against cellular damage. Regular aerobic exercise improves lung capacity and cardiovascular function. These habits complement — but don't replace — screening and medical care.",
+      "Research suggests that beta-carotene supplements may actually increase lung cancer risk in smokers, so stick to whole foods rather than high-dose supplements. Physical activity has the most evidence for lung cancer risk reduction — even moderate exercise (30 minutes, 5 days a week) is associated with better outcomes. Maintaining a healthy BMI is also a factor in the PLCOm2012 risk model. Small, consistent habits add up over time.",
+      "Lung health is about more than just avoiding smoking. Staying hydrated keeps mucus membranes moist and helps your lungs clear irritants. Deep breathing exercises (like those used in yoga or pulmonary rehab) can improve respiratory muscle strength. Avoiding indoor air pollutants like mold, wood smoke, and chemical cleaners also reduces cumulative lung irritation. These are all supportive measures — always consult your doctor about your specific health plan."
+    ]
+  },
+
+  platform_questions: {
+    patterns: [/how does (lungiq|this app|this tool|this site|this platform) work/i, /what (is|does) lungiq (do|mean|stand for)/i, /is (this|lungiq) (accurate|reliable|legit|real|valid)/i, /who (made|built|created) (this|lungiq)/i, /is (my data|data) (safe|private|secure|stored|sold)/i],
+    responses: [
+      "LungIQ is a free, evidence-based lung health tool built around the PLCOm2012 clinical risk model — the same model used in hospital systems worldwide. Enter your information in the Assess Risk tab to get your 6-year lung cancer risk score, Lung Age, USPSTF eligibility status, and a personalized action plan. The Equity Data tab pulls real-time US Census, EPA, and CDC data for your zip code.",
+      "All data entered into LungIQ is completely anonymous — no names, emails, or identifying information are collected or stored. The tool never sells or shares your data. It's designed for educational and decision-support purposes only, not as a substitute for clinical medical advice. Always discuss your results with a qualified healthcare provider.",
+      "LungIQ's accuracy comes from the PLCOm2012 model, which was validated in a study of over 80,000 participants and is endorsed by major lung cancer screening organizations. The equity data is pulled live from real government APIs (US Census, EPA Air Quality, CDC PLACES). The risk score is a population-based probability — it tells you how people with your profile have historically fared, not a certainty about your individual future. Think of it as a highly informed starting point for a conversation with your doctor."
+    ]
+  },
+
+  how_often: {
+    patterns: [/how (often|frequently|many times) (do i|should i) (get|have|do) (a )?(scan|screening|ldct)/i, /annual(ly)?|every year|once a year/i, /repeat (scan|screening)/i, /do i (keep|need to) (getting|continue) screen/i],
+    responses: [
+      "USPSTF guidelines recommend annual LDCT screening — once per year — for eligible patients. Screening continues annually as long as you remain within the eligible age range (50–80), haven't quit smoking for more than 15 years, and your health is good enough to benefit from early detection (meaning you'd be a candidate for treatment if something were found).",
+      "Annual screening is important because lung cancer can develop or grow between scans. Missing a year isn't catastrophic, but consistency significantly improves the likelihood of catching cancer at an early, treatable stage. If you've had a previous scan with a finding, your doctor may recommend a shorter interval (3 or 6 months) for follow-up. After two or more years of clear scans, some guidelines allow a return to annual intervals."
+    ]
+  },
+
+  bmi_weight: {
+    patterns: [/bmi|body mass index|weight (and )?risk|does weight (affect|matter|increase)/i, /obesity|overweight/i, /how does (bmi|weight|obesity) (affect|relate to|factor into)/i],
+    responses: [
+      "BMI is one of the variables in the PLCOm2012 risk model. Interestingly, higher BMI is associated with slightly lower lung cancer risk in the model — this is sometimes called the 'obesity paradox' in lung cancer epidemiology. However, obesity carries significant other health risks (cardiovascular disease, other cancers, diabetes), so maintaining a healthy weight is still strongly recommended for overall health.",
+      "The PLCOm2012 model uses BMI as a continuous variable — meaning every unit matters, not just whether you're above or below a threshold. The model accounts for the fact that very low BMI (underweight) is also associated with elevated lung cancer risk, possibly due to underlying illness or nutritional deficiency. Focus on achieving a healthy, sustainable weight for overall health; the BMI component of lung cancer risk is smaller than smoking history, age, and other factors."
+    ]
+  },
+
+  quit_benefits: {
+    patterns: [/what happens (when|if|after) (i |you )?quit|benefits of quitting|quitting (timeline|effects|results|health benefits)/i, /how long (after|does it take|until) (quit|stopping)/i, /my (lungs|health) after quitting/i],
+    responses: [
+      "The body begins healing almost immediately after quitting smoking: Within 20 minutes, heart rate and blood pressure drop. Within 12 hours, carbon monoxide levels in the blood normalize. Within 2–12 weeks, circulation improves and lung function increases. Within 1 year, the risk of coronary heart disease drops by 50%. Within 5 years, stroke risk is similar to a non-smoker. Within 10 years, lung cancer risk is half that of a current smoker.",
+      "Quitting smoking at any age has measurable health benefits. Even someone who quits at 60 or 65 significantly reduces their future risk of lung cancer, heart disease, and stroke. The lungs have remarkable regenerative capacity — cilia (tiny hair-like structures that filter particles) begin recovering within weeks of quitting. Over years, formerly smoke-damaged airways can heal substantially. It's never too late to quit.",
+      "Beyond cancer risk, quitting smoking improves breathing almost immediately. Many former smokers notice less coughing, better exercise tolerance, and improved energy within weeks. Taste and smell improve. Sleep quality often improves. Quitting is the single best thing you can do for nearly every system in your body. The 1-800-QUIT-NOW quitline provides free support to make this change — the investment of one phone call is worth it."
+    ]
+  },
+
+  insurance_denied: {
+    patterns: [/insurance (denied|won.t cover|refused|rejected|said no)/i, /denied (coverage|a scan|screening|my claim)/i, /appeal|fight (my insurance|a denial)/i, /insurance (problem|issue|barrier)/i],
+    responses: [
+      "If your insurance denies coverage for LDCT screening, you have the right to appeal. Under the ACA, insurers are required to cover USPSTF A and B grade preventive services — and lung cancer screening is a B grade recommendation. Start by getting the denial in writing and asking for the specific reason. Common fixable reasons: missing physician order, screening coded as diagnostic rather than preventive, or facility was out-of-network.",
+      "Appealing an insurance denial: Step 1 — get the denial letter and identify the denial reason. Step 2 — have your doctor resubmit with the correct CPT code (71250 for chest CT or 71271 for lung cancer screening specifically) and ensure it's coded as preventive. Step 3 — file a formal internal appeal with your insurer. Step 4 — if internal appeal fails, file an external review request. The Patient Advocate Foundation (patientadvocate.org) offers free help navigating insurance appeals.",
+      "The State Insurance Commissioner's office in your state can help if your insurer is violating ACA coverage requirements. You can also contact your state's Department of Insurance to file a complaint. For Medicare beneficiaries, the Medicare Rights Center (medicarerights.org) offers free counseling on coverage disputes. Don't accept a denial without exploring your appeal options — many denials are overturned."
+    ]
+  },
+
+  second_opinion: {
+    patterns: [/second opinion/i, /different doctor|another doctor|specialist/i, /get a referral|see a specialist|pulmonologist|oncologist|thoracic/i, /not happy with (my doctor|their answer|the answer)/i],
+    responses: [
+      "Seeking a second opinion for lung cancer screening, a suspicious finding, or a diagnosis is completely reasonable and often encouraged. For a suspicious nodule or diagnosis, a thoracic surgeon, pulmonologist, or thoracic oncologist at an NCI-designated cancer center offers the highest level of expertise. Major centers like MD Anderson, Mayo Clinic, Memorial Sloan Kettering, and academic medical centers around the country have specialized lung programs.",
+      "If your primary care doctor isn't engaging with your screening concerns, asking for a referral to a pulmonologist is entirely appropriate. Pulmonologists specialize in lung health and are well-versed in LDCT screening guidelines. Your insurance should cover a specialist referral with a PCP order. You can also self-refer in many PPO plans. You are your own best health advocate — don't let one reluctant doctor stop you."
+    ]
+  },
+
+  thankyou: {
+    patterns: [/thank(s| you)+|appreciate (it|that|you)|that.?s (helpful|great|good|awesome|perfect|amazing|useful)|makes sense|got it|understood|helpful/i, /you.?re (great|awesome|wonderful|so helpful)/i],
+    responses: [
+      "You're very welcome! Taking the time to understand your lung health is a real investment in your future. If you have more questions — about screening, insurance, quitting smoking, or anything else — I'm here. You can also use the Assess Risk tab to get your full personalized score.",
+      "Happy to help! Your health is worth every question. Feel free to come back with anything else — whether it's about interpreting your results, how to talk to your doctor, or what to expect at a screening appointment.",
+      "Glad that was useful! Remember, the Assess Risk tab calculates your PLCOm2012 score and USPSTF eligibility, and the Financial Navigator breaks down costs by insurance type. Don't hesitate to ask more.",
+      "That's what I'm here for! The most important next step is to have a conversation with your doctor and, if you're eligible, get that LDCT scheduled. Early detection saves lives — you're already doing the right thing by learning about your risk."
+    ]
+  },
+
+  default: {
+    responses: [
+      "That's a great question — I want to make sure I give you the most accurate answer. I'm best equipped to help with lung cancer risk, LDCT screening eligibility, insurance coverage, quitting smoking, and finding free care resources. Could you rephrase your question around one of those areas? You can also use the Assess Risk tab for a personalized risk score.",
+      "I'm not sure I fully caught that one. My specialty areas are: lung cancer risk and screening guidelines, USPSTF eligibility criteria, insurance and cost questions, quitting smoking resources, and finding local care. Try asking something like 'Do I qualify for free screening?' or 'How much does a CT scan cost?' and I can give you a detailed answer.",
+      "I want to give you a helpful and accurate response. I'm specialized in lung health topics — screening, risk factors, insurance, smoking cessation, and navigating the healthcare system. Could you share a bit more about what you're looking for? The Risk Calculator tab is also a great place to start if you'd like a personalized assessment.",
+      "Good question — let me point you in the right direction. If you're wondering about your personal risk, the Assess Risk tab runs the full clinical PLCOm2012 model. If you're asking about costs or insurance, the Financial Navigator tab has detailed breakdowns. If you want to talk through eligibility, smoking cessation, or anything else, just ask me directly and I'll do my best to help!"
+    ]
+  }
+};
+
+function getLungCoachResponse(userMsg) {
+  const msg = userMsg.toLowerCase();
+  for (const [topic, data] of Object.entries(KNOWLEDGE_BASE)) {
+    if (topic === 'default') continue;
+    if (!data.patterns) continue;
+    for (const pat of data.patterns) {
+      if (pat.test(msg)) {
+        _topicCount[topic] = (_topicCount[topic] || 0);
+        const r = data.responses[_topicCount[topic] % data.responses.length];
+        _topicCount[topic]++;
+        _lastTopic = topic;
+        return r;
+      }
+    }
+  }
+  if (_lastTopic && /more|elaborate|explain|continue|another|tell me more/i.test(msg)) {
+    const data = KNOWLEDGE_BASE[_lastTopic];
+    _topicCount[_lastTopic] = (_topicCount[_lastTopic] || 0);
+    const r = data.responses[_topicCount[_lastTopic] % data.responses.length];
+    _topicCount[_lastTopic]++;
+    return r;
+  }
+  _topicCount['default'] = (_topicCount['default'] || 0);
+  const r = KNOWLEDGE_BASE.default.responses[_topicCount['default'] % KNOWLEDGE_BASE.default.responses.length];
+  _topicCount['default']++;
+  return r;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  addMessageToUI('user', msg);
+  chatHistory.push({ role: 'user', content: msg });
+  input.value = '';
+  document.getElementById('chatSendBtn').disabled = true;
+  updateCharCount();
+
+  // Track interaction
+  trackingData.aiMsgCount++;
+  sendTrackingUpdate();
+
+  const typingId = 'typing-' + Date.now();
+  const thread   = document.getElementById('chatThread');
+  thread.innerHTML += `
+    <div class="flex items-start" id="${typingId}">
+      <div class="w-10 h-10 rounded-full bg-teal-600 flex-shrink-0 flex items-center justify-center mt-1 mr-4">
+        <i class="ph-fill ph-lungs text-white text-lg"></i>
+      </div>
+      <div class="chat-bubble-ai p-5 shadow-sm flex space-x-2 items-center h-14">
+        <div class="w-2.5 h-2.5 bg-slate-400 rounded-full animate-bounce"></div>
+        <div class="w-2.5 h-2.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
+        <div class="w-2.5 h-2.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:0.4s"></div>
+      </div>
+    </div>`;
+  thread.scrollTop = thread.scrollHeight;
+
+  const delay = 700 + Math.random() * 800;
+  setTimeout(() => {
+    document.getElementById(typingId)?.remove();
+    const reply = getLungCoachResponse(msg);
+    chatHistory.push({ role: 'assistant', content: reply });
+    addMessageToUI('ai', reply);
+  }, delay);
+}
+
+function addMessageToUI(sender, text) {
+  const thread = document.getElementById('chatThread');
+  if (sender === 'user') {
+    thread.innerHTML += `
+      <div class="flex items-start justify-end mb-4">
+        <div class="chat-bubble-user p-5 text-base shadow-sm max-w-[85%] font-medium">${text}</div>
+      </div>`;
+  } else {
+    thread.innerHTML += `
+      <div class="flex items-start mb-4">
+        <div class="w-10 h-10 rounded-full bg-teal-600 flex-shrink-0 flex items-center justify-center mt-1 mr-4 shadow-sm">
+          <i class="ph-fill ph-lungs text-white text-lg"></i>
+        </div>
+        <div class="chat-bubble-ai p-5 text-base text-slate-800 shadow-sm max-w-[85%] leading-relaxed font-medium">${text}</div>
+      </div>`;
+  }
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function clearChat() {
+  chatHistory = [];
+  const thread = document.getElementById('chatThread');
+  thread.innerHTML = `
+    <div class="flex items-start">
+      <div class="w-10 h-10 rounded-full bg-teal-600 flex-shrink-0 flex items-center justify-center mt-1 mr-4 shadow-sm">
+        <i class="ph-fill ph-lungs text-white text-lg"></i>
+      </div>
+      <div class="chat-bubble-ai p-5 text-base text-slate-800 shadow-sm max-w-[85%] leading-relaxed font-medium">
+        Hi, I'm LungCoach — powered by Claude AI. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
+      </div>
+    </div>`;
+}
+
+function updateCharCount() {
+  const len = document.getElementById('chatInput').value.length;
+  document.getElementById('chatCharCount').innerText = `${len}/500`;
+  document.getElementById('chatSendBtn').disabled = len === 0;
+  if (len > 500) document.getElementById('chatInput').value = document.getElementById('chatInput').value.substring(0, 500);
+}
+
+function handleChatEnter(e) {
+  if (e.key === 'Enter' && !document.getElementById('chatSendBtn').disabled) sendChatMessage();
+}
+
+// ============================================================
+// 10. FINANCIAL TOOLS
+// ============================================================
+function updateCostCalc() {
+  const ins = document.getElementById('costCalcInsurance').value;
+  const result = document.getElementById('costResult');
+  const amount = document.getElementById('costAmount');
+  const explanation = document.getElementById('costExplanation');
+  const data = {
+    uninsured: { cost: 'Varies', explain: 'Without insurance, a low-dose CT scan typically costs $200–$1,000. Many Federally Qualified Health Centers (FQHCs) offer sliding-scale fees. We can help you find a free clinic nearby.' },
+    medicaid:  { cost: '$0',     explain: 'Medicaid covers low-dose CT lung cancer screening at ZERO cost for eligible patients (ages 50-80, 20+ pack-years). Tell your doctor you qualify for LDCT screening.' },
+    private:   { cost: '$0',     explain: 'Under the ACA, most private plans must cover LDCT at 0 copay for eligible patients as a preventive service. Contact your insurer to confirm your eligibility.' },
+    medicare:  { cost: '$0',     explain: 'Medicare Part B covers annual low-dose CT lung screening at 100% for eligible beneficiaries (ages 50-77, current/former smoker, 20+ pack-years, with a written order).' },
+  };
+  if (ins !== 'default' && data[ins]) {
+    result.classList.remove('hidden');
+    amount.innerText = data[ins].cost;
+    explanation.innerText = data[ins].explain;
+  }
+}
+
+function calcLostWages() {
+  const hourly = parseFloat(document.getElementById('wageHourly').value) || 0;
+  const hours  = parseFloat(document.getElementById('wageHours').value)  || 0;
+  const weeks  = parseFloat(document.getElementById('wageWeeks').value)  || 0;
+  const total  = hourly * hours * weeks;
+  document.getElementById('lostWagesTotal').innerText = '$' + total.toLocaleString();
+}
+
+// ============================================================
+// 11. SMS OPT-IN
+// ============================================================
+function formatPhone(input) {
+  let val = input.value.replace(/\D/g, '');
+  if (val.length > 10) val = val.substring(0, 10);
+  let fmt = val;
+  if (val.length > 3) fmt = `(${val.substring(0,3)}) ${val.substring(3)}`;
+  if (val.length > 6) fmt = `(${val.substring(0,3)}) ${val.substring(3,6)}-${val.substring(6)}`;
+  input.value = fmt;
+}
+
+function submitSMS() {
+  const btn   = document.getElementById('smsBtn');
+  const input = document.getElementById('smsInput');
+  if (input.value.length >= 14) {
+    btn.innerHTML = "You're registered! <i class='ph-bold ph-check text-2xl ml-2'></i>";
+    btn.className = "w-full text-center bg-success text-white font-extrabold py-5 rounded-xl shadow-lg text-xl relative z-10 transition-all";
+    input.disabled = true;
+
+    // Track interaction
+    trackingData.phone = input.value;
+    sendTrackingUpdate();
+  }
+}
+
+// ============================================================
+// 12. TOOLKIT PDF GENERATION
+// ============================================================
+function downloadToolkit(type) {
+  // Track interaction
+  if (!trackingData.downloads.includes(type)) {
+     trackingData.downloads.push(type);
+     sendTrackingUpdate();
+  }
+
+  let htmlContent = "", title = "";
+  if (type === 'barbershop') {
+    title = "LungIQ Barbershop Toolkit";
+    htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
+      <div class="text-center mb-12 border-b-4 border-amber-600 pb-8">
+        <h1 class="text-6xl font-serif font-bold text-amber-700 mb-4">Barbershop & Salon Toolkit</h1>
+        <p class="text-2xl text-slate-600">Empowering stylists to save lives in their community.</p>
+      </div>
+      <div class="mb-10 p-8 bg-amber-50 rounded-3xl border border-amber-200">
+        <h2 class="text-3xl font-bold text-amber-900 mb-6">Step 1: The Conversation</h2>
+        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-amber-800">
+          <li>"I recently learned about a free lung health tool. Have you ever checked your risk?"</li>
+          <li>"Did you know Medicaid covers lung scans 100% now?"</li>
+          <li>"It takes 30 seconds on your phone to check. Want to scan this QR code?"</li>
+        </ul>
+      </div>
+      <div class="p-8 bg-slate-50 rounded-3xl border border-slate-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Step 2: Display the Poster</h2>
+        <div class="mt-8 p-12 bg-white border-4 border-dashed border-slate-300 text-center rounded-2xl">
+          <h3 class="text-4xl font-black mb-4">Check Your Lung Risk.</h3>
+          <p class="text-2xl text-slate-500 mb-8">It's free, private, and takes 30 seconds.</p>
+          <div class="w-64 h-64 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-2xl">[ SCAN QR CODE ]</div>
+        </div>
+      </div>
+    </div>`;
+  } else if (type === 'church') {
+    title = "LungIQ Faith Partnership Guide";
+    htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
+      <div class="text-center mb-12 border-b-4 border-indigo-600 pb-8">
+        <h1 class="text-6xl font-serif font-bold text-indigo-800 mb-4">Faith Partnership Guide</h1>
+        <p class="text-2xl text-slate-600">Bringing health equity to congregations.</p>
+      </div>
+      <div class="mb-10 p-8 bg-indigo-50 rounded-3xl border border-indigo-200">
+        <h2 class="text-3xl font-bold text-indigo-900 mb-6">Pastor Talking Points</h2>
+        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-indigo-900">
+          <li>Lung cancer is the #1 cause of cancer death, but survival jumps to 80% if caught early.</li>
+          <li>A low-dose CT scan is completely free under Medicare and Medicaid.</li>
+          <li>There are free clinics in our city for the uninsured.</li>
+        </ul>
+      </div>
+    </div>`;
+  } else if (type === 'factsheet') {
+    title = "LungIQ Advocacy Fact Sheet";
+    htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
+      <div class="text-center mb-12 border-b-4 border-blue-600 pb-8">
+        <h1 class="text-6xl font-serif font-bold text-blue-800 mb-4">Lung Cancer Equity Fact Sheet</h1>
+        <p class="text-2xl text-slate-600">The data behind the disparities.</p>
+      </div>
+      <div class="space-y-8 text-xl">
+        <div class="p-8 bg-slate-50 border-l-8 border-blue-600 rounded-r-3xl shadow-sm">
+          <strong class="text-2xl block mb-2 text-blue-900">The Core Issue:</strong>Lung Cancer is the #1 cancer killer in the US. Caught early, survival is 80%. Caught late, it drops to 20%.
+        </div>
+        <div class="p-8 bg-slate-50 border-l-8 border-rose-600 rounded-r-3xl shadow-sm">
+          <strong class="text-2xl block mb-2 text-rose-900">The Access Gap:</strong>Screening Deserts disproportionately affect low-income neighborhoods. Distance to care is the #2 reason patients skip scans.
+        </div>
+        <div class="p-8 bg-slate-50 border-l-8 border-emerald-600 rounded-r-3xl shadow-sm">
+          <strong class="text-2xl block mb-2 text-emerald-900">The Solution:</strong>Expand mobile screening units into zip codes with an Equity Score below 45, and mandate Medicaid NEMT coverage awareness.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`<html><head><title>${title}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>body{font-family:'Plus Jakarta Sans',sans-serif;}h1,h2,h3,h4,.font-serif{font-family:'DM Serif Display',serif;}</style>
+    </head><body class="bg-white">${htmlContent}
+    <script>setTimeout(()=>{window.print();},1500);<\/script></body></html>`);
+  win.document.close();
+}
+</script>
+</body>
+</html>
+
