@@ -320,8 +320,8 @@ nav {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Age</label>
-                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track" oninput="validateAge(this)">
-                <p id="ageError" class="text-rose-400 text-sm font-bold mt-2 hidden">You must be at least 20 years old to use this tool.</p>
+                <input type="number" id="age" required min="15" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track" oninput="validateAge(this)">
+                <p id="ageError" class="text-rose-400 text-sm font-bold mt-2 hidden"></p>
               </div>
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Race / Ethnicity <span class="text-slate-500 font-normal text-sm ml-1">(Optional)</span></label>
@@ -1234,11 +1234,18 @@ function updateFormProgress() {
 }
 function validateAge(input) {
   const err = document.getElementById('ageError');
-  if (input.value && parseInt(input.value) < 30) {
-    err.classList.remove('hidden');
-    input.setCustomValidity('Must be at least 30');
+  const val = input.value !== '' ? parseInt(input.value) : null;
+  if (val !== null && val < 15) {
+    err.textContent = 'You must be at least 15 years old to use this tool.';
+    err.className = 'text-rose-400 text-sm font-bold mt-2';
+    input.setCustomValidity('Must be at least 15');
+  } else if (val !== null && val < 40) {
+    err.textContent = 'Heads up: the PLCOm2012 model was clinically validated for ages 40 and up, so results for ages under 40 may be less accurate.';
+    err.className = 'text-amber-400 text-sm font-bold mt-2';
+    input.setCustomValidity('');
   } else {
-    err.classList.add('hidden');
+    err.textContent = '';
+    err.className = 'text-rose-400 text-sm font-bold mt-2 hidden';
     input.setCustomValidity('');
   }
 }
