@@ -320,7 +320,8 @@ nav {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Age</label>
-                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track">
+                <input type="number" id="age" required min="20" max="90" placeholder="55" class="w-full input-dark rounded-xl p-5 text-xl font-bold form-input-track" oninput="validateAge(this)">
+                <p id="ageError" class="text-rose-400 text-sm font-bold mt-2 hidden">You must be at least 20 years old to use this tool.</p>
               </div>
               <div>
                 <label class="block text-lg mb-3 text-slate-300">Race / Ethnicity <span class="text-slate-500 font-normal text-sm ml-1">(Optional)</span></label>
@@ -376,7 +377,15 @@ nav {
               <label class="block text-base text-slate-400 mb-4 uppercase tracking-widest text-xs font-bold">Medical History</label>
               <div class="grid grid-cols-3 gap-6 items-end">
                 <div>
-                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem]">COPD?</label>
+                  <label class="block text-base mb-2 text-slate-300 min-h-[1.75rem] flex items-center gap-2">
+                    COPD?
+                    <span class="relative group">
+                      <span class="w-5 h-5 rounded-full bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-help">?</span>
+                      <span class="absolute bottom-7 left-1/2 -translate-x-1/2 w-64 bg-slate-900 text-white text-xs font-normal p-3 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 leading-relaxed border border-slate-600">
+                        <strong class="block mb-1 text-blue-300">COPD</strong> (Chronic Obstructive Pulmonary Disease) is a lung condition that blocks airflow, causing shortness of breath. It includes emphysema and chronic bronchitis, and is often caused by long-term smoking.
+                      </span>
+                    </span>
+                  </label>
                   <div class="select-wrapper">
                     <select id="copd" class="w-full input-dark rounded-xl p-4 text-base font-bold">
                       <option value="0">No</option>
@@ -475,7 +484,7 @@ nav {
             <span id="submitText">Calculate My Lung Risk</span>
           </button>
           <p class="text-sm text-slate-400 mt-8 flex items-center justify-center">
-            <i class="ph-fill ph-shield-check mr-2"></i> All data collected is completely anonymous. Never stored or sold.
+            <i class="ph-fill ph-shield-check mr-2"></i> All data collected is completely anonymous.
           </p>
         </div>
       </form>
@@ -638,7 +647,8 @@ nav {
     <div class="mb-16 text-center">
       <span class="inline-block px-5 py-2 bg-purple-100 text-purple-800 rounded-full section-label mb-6 shadow-sm">National Community Data</span>
       <h2 class="text-slate-900 mb-6">Zip Code Health Equity Report</h2>
-      <p class="text-slate-600 text-xl max-w-3xl mx-auto leading-relaxed">Where you live shouldn't determine if you survive. We pull live data from the US Census, EPA, and CDC to analyze structural disparities.</p>
+      <p class="text-slate-600 text-xl max-w-3xl mx-auto leading-relaxed">Where you live shouldn't determine if you survive — but income, air quality, and insurance access vary a lot by neighborhood, and that affects real lung cancer outcomes. Enter any US zip code below to see live, publicly-sourced data for that area.</p>
+      <p class="text-slate-500 text-base max-w-2xl mx-auto leading-relaxed mt-4"><strong>How to use this:</strong> if you're an individual, it shows you factors in your area (like air quality or uninsured rate) that may be worth mentioning to your doctor. If you're an advocate, it's evidence you can use to make the case for a mobile screening unit, an FQHC, or expanded outreach in a specific zip code.</p>
     </div>
 
     <div class="bg-white p-8 md:p-10 rounded-[3rem] shadow-secondary border border-gray-200 mb-12 flex flex-col sm:flex-row items-center gap-8 max-w-4xl mx-auto interactive-card">
@@ -851,31 +861,30 @@ nav {
       <div class="bg-white rounded-[3rem] p-10 md:p-12 shadow-primary border border-gray-200 interactive-card flex flex-col justify-between">
         <div>
           <div class="flex items-center mb-8">
-            <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mr-5"><i class="ph-fill ph-money text-success text-3xl"></i></div>
-            <h3 class="text-3xl font-serif font-bold text-slate-900">Lost Wages Calculator</h3>
+            <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mr-5"><i class="ph-fill ph-clock-countdown text-success text-3xl"></i></div>
+            <h3 class="text-3xl font-serif font-bold text-slate-900">"Time Off Work" Estimator</h3>
           </div>
-          <div class="grid grid-cols-3 gap-4 mb-8">
+          <p class="text-lg text-slate-600 mb-8 leading-relaxed">A screening appointment usually only takes a few hours, not weeks. This estimates what missing that much work could cost you — so you can plan around it instead of avoiding the scan altogether.</p>
+          <div class="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label class="block text-sm font-bold text-slate-500 mb-2">Hourly ($)</label>
-              <input type="number" id="wageHourly" value="15" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
+              <label class="block text-sm font-bold text-slate-500 mb-2">Your Hourly Wage ($)</label>
+              <input type="number" id="wageHourly" value="18" min="0" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
             </div>
             <div>
-              <label class="block text-sm font-bold text-slate-500 mb-2">Hrs/Wk</label>
-              <input type="number" id="wageHours" value="40" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-500 mb-2">Weeks</label>
-              <input type="number" id="wageWeeks" value="4" min="1" max="12" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
+              <label class="block text-sm font-bold text-slate-500 mb-2">Hours You'd Miss</label>
+              <input type="number" id="wageHours" value="3" min="0" max="12" step="0.5" class="w-full input-light rounded-xl p-4 text-xl font-bold text-center" oninput="calcLostWages()">
             </div>
           </div>
+          <p class="text-sm text-slate-400 mb-8">Most people need 2–4 hours total: travel, check-in, the 10-minute scan itself, and travel back. Add more time if your clinic is far away.</p>
         </div>
         <div class="mt-auto">
           <div class="bg-emerald-50 rounded-[2rem] p-8 border border-emerald-100 flex justify-between items-center mb-6 shadow-sm">
             <div>
-              <div class="section-label text-emerald-700 text-sm mb-1">Est. Total Loss</div>
-              <div id="lostWagesTotal" class="text-5xl font-serif font-bold text-emerald-900">$2,400</div>
+              <div class="section-label text-emerald-700 text-sm mb-1">Est. Cost of This Appointment</div>
+              <div id="lostWagesTotal" class="text-5xl font-serif font-bold text-emerald-900">$54</div>
             </div>
           </div>
+          <p class="text-sm text-slate-500 leading-relaxed">Ways to reduce this: ask about early-morning, evening, or Saturday screening slots; check if you're eligible for job-protected leave under FMLA; or ask your employer's HR about paid preventive-care time. Some FQHCs also offer walk-in hours that don't require scheduling ahead.</p>
         </div>
       </div>
     </div>
@@ -919,6 +928,28 @@ nav {
           <button onclick="downloadToolkit('church')" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-extrabold text-xl hover:bg-slate-800 transition-colors shadow-md relative z-10">Download PDF Guide</button>
         </div>
       </div>
+
+      <div class="bg-white rounded-[3rem] overflow-hidden interactive-card flex flex-col shadow-secondary border border-gray-200 relative">
+        <div class="h-64 relative flex items-center justify-center" style="background: radial-gradient(circle at top right, #0d9488, #134e4a);">
+          <i class="ph-fill ph-backpack text-[9rem] text-white/10 absolute -right-6 -bottom-6"></i>
+          <h3 class="text-5xl font-serif font-bold relative z-10 px-8 text-white drop-shadow-md text-center">Schools & <br>Staff Rooms</h3>
+        </div>
+        <div class="p-10 flex-grow flex flex-col justify-between bg-white relative border-t border-slate-200">
+          <p class="text-slate-800 text-lg mb-8 leading-relaxed font-semibold relative z-10">A staff-room poster and PTA/newsletter blurb to reach parents, grandparents, and staff who may be eligible for screening.</p>
+          <button onclick="downloadToolkit('school')" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-extrabold text-xl hover:bg-slate-800 transition-colors shadow-md relative z-10">Download PDF Toolkit</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-[3rem] overflow-hidden interactive-card flex flex-col shadow-secondary border border-gray-200 relative">
+        <div class="h-64 relative flex items-center justify-center" style="background: radial-gradient(circle at top left, #0369a1, #1e3a8a);">
+          <i class="ph-fill ph-swimming-pool text-[9rem] text-white/10 absolute -left-6 -bottom-6"></i>
+          <h3 class="text-5xl font-serif font-bold relative z-10 px-8 text-white drop-shadow-md text-center">Public Spaces <br>(Pools, Libraries, Rec Centers)</h3>
+        </div>
+        <div class="p-10 flex-grow flex flex-col justify-between bg-white relative border-t border-slate-200">
+          <p class="text-slate-800 text-lg mb-8 leading-relaxed font-semibold relative z-10">A break-room / bulletin-board poster for pools, libraries, gyms, and rec centers — high-traffic public spots everyone passes through.</p>
+          <button onclick="downloadToolkit('publicspaces')" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-extrabold text-xl hover:bg-slate-800 transition-colors shadow-md relative z-10">Download PDF Poster</button>
+        </div>
+      </div>
     </div>
 
     <div class="bg-[#f8fafc] rounded-[3rem] p-10 md:p-12 shadow-primary border border-gray-200 flex flex-col justify-between mt-12">
@@ -940,8 +971,8 @@ nav {
     </div>
 
     <div class="max-w-5xl mx-auto text-center pt-12 mt-12 border-t border-gray-200">
-      <button onclick="switchView('chatbot')" class="bg-teal-700 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-teal-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
-        <i class="ph-bold ph-brain mr-3 text-2xl"></i> Talk to LungCoach AI
+      <button onclick="switchView('chatbot')" class="bg-slate-900 text-white font-bold py-5 px-10 rounded-2xl shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-1 text-xl flex items-center justify-center mx-auto">
+        <i class="ph-bold ph-brain mr-3 text-2xl"></i> Talk to LungCoach
       </button>
     </div>
   </div>
@@ -956,8 +987,8 @@ nav {
           <i class="ph-fill ph-lungs text-white text-3xl"></i>
         </div>
         <div>
-          <h3 class="text-2xl font-serif font-bold text-white">LungCoach AI</h3>
-          <p class="text-sm text-blue-200 font-medium">Powered by Claude · All conversations are anonymous</p>
+          <h3 class="text-2xl font-serif font-bold text-white">LungCoach</h3>
+          <p class="text-sm text-blue-200 font-medium">All conversations are anonymous</p>
         </div>
       </div>
       <button onclick="clearChat()" class="text-slate-400 hover:text-white transition-colors text-sm font-bold flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
@@ -971,7 +1002,7 @@ nav {
           <i class="ph-fill ph-lungs text-white text-lg"></i>
         </div>
         <div class="chat-bubble-ai p-5 text-base text-slate-800 shadow-sm max-w-[85%] leading-relaxed font-medium">
-          Hi, I'm LungCoach — powered by Claude AI. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
+          Hi, I'm LungCoach. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
         </div>
       </div>
     </div>
@@ -999,7 +1030,7 @@ nav {
     <div>
       <span class="font-serif italic font-bold text-4xl text-slate-900 block mb-3">LungIQ</span>
       <p class="text-base mb-6 leading-relaxed text-slate-700">Focusing on equitable access to lung health nationwide. All data is collected anonymously.</p>
-      <span class="text-sm font-bold bg-slate-200 px-4 py-2 rounded-full text-slate-800 tracking-wider border border-slate-300">Built for CYL</span>
+      <span class="text-sm font-bold bg-slate-200 px-4 py-2 rounded-full text-slate-800 tracking-wider border border-slate-300">Built for ALCSI 2025</span>
     </div>
     <div class="flex flex-col space-y-3 text-base font-bold">
       <h4 class="text-slate-900 font-bold mb-3 text-lg">Quick Links</h4>
@@ -1195,6 +1226,16 @@ function updateFormProgress() {
   const fields = ['zipCode', 'areaType', 'insurance', 'age', 'smokingStatus', 'barrierHidden'];
   fields.forEach(id => { if (document.getElementById(id).value !== "") filled++; });
   document.getElementById('fieldsComplete').innerText = `${filled} of 6 fields complete`;
+}
+function validateAge(input) {
+  const err = document.getElementById('ageError');
+  if (input.value && parseInt(input.value) < 30) {
+    err.classList.remove('hidden');
+    input.setCustomValidity('Must be at least 30');
+  } else {
+    err.classList.add('hidden');
+    input.setCustomValidity('');
+  }
 }
 
 function validateZip() {
@@ -1711,7 +1752,7 @@ const KNOWLEDGE_BASE = {
   },
 
   screening: {
-    patterns: [/screen(ing)?/i, /ldct|low.?dose|ct scan|lung scan/i, /annual scan|yearly scan/i, /get tested|get scanned|get checked/i, /should i (get|have) a scan/i, /do i need a scan/i, /when (should|do) i (get|have|need)/i],
+    patterns: [/screen(ing)?/i, /ldct|low.?dose|ct scan|lung scan/i, /annual scan|yearly scan/i, /get tested|get scanned|get checked/i, /should i (get|have) a scan/i, /when (should|do) i (get|have|need)/i],
     responses: [
       "LDCT (Low-Dose CT) lung screening is a quick, painless 10-minute scan that can detect lung cancer at its earliest and most treatable stage — often before any symptoms appear. The USPSTF recommends it annually for adults aged 50–80 who are current or former smokers with at least 20 pack-years of history. Ask your doctor for a written order and you're on your way. I'm not a medical professional, so always confirm with your healthcare provider.",
       "Annual low-dose CT screening is the gold standard for early lung cancer detection — catching it when it's 80% survivable versus only 20% if found late. You may qualify if you're 50–80 years old, a current or former smoker, and have smoked 20+ pack-years. The scan itself uses very low radiation — about the same as a cross-country flight. Talk to your doctor to confirm eligibility.",
@@ -1960,11 +2001,12 @@ const KNOWLEDGE_BASE = {
   },
 
   find_center: {
-    patterns: [/find (a |the )?(screening center|clinic|hospital|facility|place)/i, /where (can i|do i|to) (get|have|do|find) (a )?(scan|screening|ldct)/i, /nearest (screening|clinic|hospital)/i, /how (do i|to) (schedule|book|make) (an )?(appointment|scan)/i, /where (is|are) (free|local) (clinics?|centers?)/i],
+    patterns: [/find (a |the )?(screening center|clinic|hospital|facility|place)/i, /where (can i|do i|to) (get|have|do|find) (a )?(scan|screening|ldct)/i, /nearest (screening|clinic|hospital)/i, /how (do i|to) (schedule|book|make) (an )?(appointment|scan)/i, /where (is|are) (free|local) (clinics?|centers?)/i, /get in touch|reach out (to|with)|contact (a|the|my)?\s*(clinic|center|hospital|screening)/i, /phone number for (a )?(clinic|center|hospital)/i, /how do i (get in touch|connect|reach)/i],
     responses: [
       "To find a certified lung cancer screening center near you, visit the American College of Radiology's Lung Cancer Screening Center registry at ACR.org/LCS. You can search by zip code for ACR-designated centers that meet quality standards. You can also ask your primary care doctor for a referral — they usually have preferred imaging centers in the area that accept your insurance.",
       "Most major hospital systems and independent radiology centers offer LDCT lung screening. When calling to schedule, say specifically: 'I'd like to schedule a low-dose CT lung cancer screening — I have a physician order.' This ensures they book you into the preventive screening protocol (which is billed at $0 for eligible patients) rather than a diagnostic CT. Having your insurance card and physician order ready will streamline the process.",
-      "For uninsured patients or those in underserved areas, the HRSA Health Center Finder (findahealthcenter.hrsa.gov) can locate nearby federally qualified health centers that offer screening services or referrals. Some hospital systems run mobile screening units that travel to underserved zip codes — contact your local hospital's community health department to ask about upcoming screening events in your area."
+      "For uninsured patients or those in underserved areas, the HRSA Health Center Finder (findahealthcenter.hrsa.gov) can locate nearby federally qualified health centers that offer screening services or referrals. Some hospital systems run mobile screening units that travel to underserved zip codes — contact your local hospital's community health department to ask about upcoming screening events in your area.",
+      "The fastest way to get in touch with a clinic: (1) call your primary care doctor's office and ask for a referral to lung cancer screening, (2) search ACR.org/LCS by zip code for a certified center near you and call their scheduling line directly, or (3) if you're uninsured, call findahealthcenter.hrsa.gov's directory to reach your nearest FQHC. In this app, the Assess Risk tab also lists sample screening centers near your zip code once you complete the quiz."
     ]
   },
 
@@ -2082,6 +2124,46 @@ const KNOWLEDGE_BASE = {
     ]
   },
 
+  veterans: {
+    patterns: [/veteran|\bva\b|military|served (in the )?(army|navy|air force|marines)|agent orange|burn pit/i, /va (hospital|clinic|benefits|healthcare)/i],
+    responses: [
+      "Veterans have their own path to free lung cancer screening through the VA health system. The VA covers annual LDCT screening at no cost for enrolled veterans who meet USPSTF criteria (ages 50–80, 20+ pack-years, current or recently-quit smoker). Veterans exposed to burn pits, Agent Orange, or other airborne hazards during service may also qualify for additional screening consideration through the VA's Airborne Hazards and Open Burn Pit Registry.",
+      "If you're a veteran, start by contacting your VA primary care team or calling the VA's main line (1-800-698-2411) and ask specifically for a 'referral for low-dose CT lung cancer screening.' If you were exposed to burn pits or other toxins during service, mention this — the PACT Act expanded VA healthcare eligibility and presumptive conditions related to these exposures, which may strengthen your case for coverage or a related claim.",
+      "Veterans who aren't yet enrolled in VA healthcare can apply at va.gov/health-care/apply or by calling 1-877-222-8387. Enrollment priority and any costs depend on factors like service-connected disability rating and income, but preventive screenings like LDCT are typically low or no cost for enrolled veterans who qualify under screening guidelines."
+    ]
+  },
+
+  language_access: {
+    patterns: [/interpreter|translat(e|or|ion)|language barrier|don.t speak english|spanish|habla espa[nñ]ol|speaks? (spanish|another language)/i],
+    responses: [
+      "You have a legal right to a free medical interpreter — hospitals and clinics that receive federal funding (which is most of them) are required to provide interpretation services at no cost under federal civil rights law. When scheduling, simply say 'I need an interpreter for [language]' and the clinic must arrange it, either in person or by phone/video. Don't let a language barrier stop you from getting screened.",
+      "The National Cancer Institute and CDC both publish Spanish-language lung cancer materials, and the national quitline has a dedicated Spanish line: 1-855-DÉJELO-YA. Many FQHCs and community health centers also have bilingual staff on-site. If a clinic ever tries to charge you for interpretation or refuses to provide one, that's a violation of federal requirements — you can file a complaint with the HHS Office for Civil Rights."
+    ]
+  },
+
+  undocumented_immigrants: {
+    patterns: [/undocumented|immigration status|not a citizen|no papers|immigrant.*insurance|daca/i],
+    responses: [
+      "Immigration status should not stop you from getting screened. Federally Qualified Health Centers (FQHCs) are required to serve everyone regardless of immigration status, insurance, or ability to pay — they will not ask about or report immigration status. Find one at findahealthcenter.hrsa.gov. Many community and free clinics operate under the same principle.",
+      "Some states offer Emergency Medicaid or state-funded health programs regardless of immigration status — availability varies, so it's worth checking with a local FQHC or community organization about what's available where you live. Community health workers ('promotores de salud' in Spanish-speaking communities) at local clinics are often the best resource for navigating this safely and confidentially."
+    ]
+  },
+
+  what_to_bring: {
+    patterns: [/what (do i|should i) bring/i, /what to expect (at|when) (check.?in|registration|arriving)/i, /paperwork (for|needed)/i, /first (time|visit) (screening|appointment)/i],
+    responses: [
+      "For your screening appointment, bring: a photo ID, your insurance card (if you have one), the written physician order/referral for the LDCT (call ahead to confirm the imaging center already has it on file), and a list of your current medications. If you're uninsured, bring anything that shows your income (like a pay stub) in case the FQHC needs it for sliding-scale pricing — though many will still see you without it.",
+      "Wear comfortable clothing without metal snaps, zippers, or underwire near your chest, since you may need to remove jewelry or change into a gown. Arrive about 15 minutes early for check-in paperwork. There's no need to fast or stop any medications beforehand for an LDCT. The whole visit, including check-in and the scan itself, usually takes under an hour."
+    ]
+  },
+
+  childcare_barrier: {
+    patterns: [/childcare|child care|kids? with me|babysitter|bring (my )?(kids|children)/i],
+    responses: [
+      "Childcare is a real barrier and clinics hear this often. Some hospital-based screening centers have a small waiting area or partner with on-site childcare/family resource programs — call ahead and ask specifically 'do you have childcare or a place for my kids to wait during my appointment?' If not, ask your care team or a hospital social worker; many maintain lists of local drop-in childcare or community programs that can help for the hour you're at your appointment."
+    ]
+  },
+
   thankyou: {
     patterns: [/thank(s| you)+|appreciate (it|that|you)|that.?s (helpful|great|good|awesome|perfect|amazing|useful)|makes sense|got it|understood|helpful/i, /you.?re (great|awesome|wonderful|so helpful)/i],
     responses: [
@@ -2102,21 +2184,46 @@ const KNOWLEDGE_BASE = {
   }
 };
 
+// Topics checked FIRST, before the generic educational topics below — these are
+// specific, action-oriented intents (e.g. "how do I contact a clinic") that should
+// win over broad keyword matches like "screening" so users get a directly useful answer.
+const PRIORITY_TOPICS = [
+  'find_center', 'transportation', 'what_to_bring', 'childcare_barrier',
+  'doctor_talk', 'insurance_denied', 'second_opinion', 'veterans',
+  'language_access', 'undocumented_immigrants', 'fqhc_clinics',
+  'financial_assistance', 'state_quitlines', 'medicare', 'medicaid',
+  'private_insurance', 'uninsured', 'cost'
+];
+
 function getLungCoachResponse(userMsg) {
   const msg = userMsg.toLowerCase();
-  for (const [topic, data] of Object.entries(KNOWLEDGE_BASE)) {
-    if (topic === 'default') continue;
-    if (!data.patterns) continue;
-    for (const pat of data.patterns) {
-      if (pat.test(msg)) {
-        _topicCount[topic] = (_topicCount[topic] || 0);
-        const r = data.responses[_topicCount[topic] % data.responses.length];
-        _topicCount[topic]++;
-        _lastTopic = topic;
-        return r;
+
+  const tryTopics = (topicKeys) => {
+    for (const topic of topicKeys) {
+      const data = KNOWLEDGE_BASE[topic];
+      if (!data || !data.patterns) continue;
+      for (const pat of data.patterns) {
+        if (pat.test(msg)) {
+          _topicCount[topic] = (_topicCount[topic] || 0);
+          const r = data.responses[_topicCount[topic] % data.responses.length];
+          _topicCount[topic]++;
+          _lastTopic = topic;
+          return r;
+        }
       }
     }
-  }
+    return null;
+  };
+
+  // Check priority (specific/actionable) topics first
+  let hit = tryTopics(PRIORITY_TOPICS);
+  if (hit) return hit;
+
+  // Then check every remaining topic in normal order
+  const remainingTopics = Object.keys(KNOWLEDGE_BASE).filter(k => k !== 'default' && !PRIORITY_TOPICS.includes(k));
+  hit = tryTopics(remainingTopics);
+  if (hit) return hit;
+
   if (_lastTopic && /more|elaborate|explain|continue|another|tell me more/i.test(msg)) {
     const data = KNOWLEDGE_BASE[_lastTopic];
     _topicCount[_lastTopic] = (_topicCount[_lastTopic] || 0);
@@ -2197,7 +2304,7 @@ function clearChat() {
         <i class="ph-fill ph-lungs text-white text-lg"></i>
       </div>
       <div class="chat-bubble-ai p-5 text-base text-slate-800 shadow-sm max-w-[85%] leading-relaxed font-medium">
-        Hi, I'm LungCoach — powered by Claude AI. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
+        Hi, I'm LungCoach. I can answer questions about lung cancer risk, screening eligibility, insurance coverage, and local resources. What's on your mind?
       </div>
     </div>`;
 }
@@ -2237,9 +2344,8 @@ function updateCostCalc() {
 function calcLostWages() {
   const hourly = parseFloat(document.getElementById('wageHourly').value) || 0;
   const hours  = parseFloat(document.getElementById('wageHours').value)  || 0;
-  const weeks  = parseFloat(document.getElementById('wageWeeks').value)  || 0;
-  const total  = hourly * hours * weeks;
-  document.getElementById('lostWagesTotal').innerText = '$' + total.toLocaleString();
+  const total  = hourly * hours;
+  document.getElementById('lostWagesTotal').innerText = '$' + total.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 // ============================================================
@@ -2280,27 +2386,37 @@ function downloadToolkit(type) {
 
   let htmlContent = "", title = "";
   if (type === 'barbershop') {
-    title = "LungIQ Barbershop Toolkit";
+    title = "LungIQ Barbershop & Salon Toolkit";
     htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
       <div class="text-center mb-12 border-b-4 border-amber-600 pb-8">
         <h1 class="text-6xl font-serif font-bold text-amber-700 mb-4">Barbershop & Salon Toolkit</h1>
-        <p class="text-2xl text-slate-600">Empowering stylists to save lives in their community.</p>
+        <p class="text-2xl text-slate-600">A 10-minute conversation in your chair can lead to a life-saving scan.</p>
       </div>
       <div class="mb-10 p-8 bg-amber-50 rounded-3xl border border-amber-200">
-        <h2 class="text-3xl font-bold text-amber-900 mb-6">Step 1: The Conversation</h2>
-        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-amber-800">
-          <li>"I recently learned about a free lung health tool. Have you ever checked your risk?"</li>
-          <li>"Did you know Medicaid covers lung scans 100% now?"</li>
-          <li>"It takes 30 seconds on your phone to check. Want to scan this QR code?"</li>
+        <h2 class="text-3xl font-bold text-amber-900 mb-6">Why This Matters Here</h2>
+        <p class="text-xl leading-relaxed text-amber-900">Barbershops and salons are trusted spaces where people already talk openly about their health. Regular clients — especially those 50+ who smoke or used to smoke — are exactly who lung cancer screening guidelines are meant for. You don't need to be a health expert. You just need to start the conversation.</p>
+      </div>
+      <div class="mb-10 p-8 bg-white rounded-3xl border-2 border-amber-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">3 Lines That Open the Door</h2>
+        <ul class="list-disc pl-10 text-xl space-y-4 font-medium text-slate-800">
+          <li>"Hey, are you 50 or older and ever smoked? There's a free 10-minute scan that catches lung cancer early — most people don't even know they qualify."</li>
+          <li>"Medicare and Medicaid cover this scan at zero cost if you qualify — no copay."</li>
+          <li>"Scan this QR code right now on your phone — takes 30 seconds to check your risk."</li>
         </ul>
       </div>
-      <div class="p-8 bg-slate-50 rounded-3xl border border-slate-200">
-        <h2 class="text-3xl font-bold text-slate-900 mb-6">Step 2: Display the Poster</h2>
-        <div class="mt-8 p-12 bg-white border-4 border-dashed border-slate-300 text-center rounded-2xl">
-          <h3 class="text-4xl font-black mb-4">Check Your Lung Risk.</h3>
-          <p class="text-2xl text-slate-500 mb-8">It's free, private, and takes 30 seconds.</p>
-          <div class="w-64 h-64 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-2xl">[ SCAN QR CODE ]</div>
+      <div class="mb-10 p-8 bg-slate-50 rounded-3xl border border-slate-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">The Key Facts (memorize these 3)</h2>
+        <div class="grid grid-cols-3 gap-6 text-center">
+          <div class="bg-white rounded-2xl p-6 border border-slate-200"><div class="text-4xl font-black text-amber-700 mb-2">80%</div><div class="text-base font-bold text-slate-600">survival rate if caught early vs. ~20% if caught late</div></div>
+          <div class="bg-white rounded-2xl p-6 border border-slate-200"><div class="text-4xl font-black text-amber-700 mb-2">$0</div><div class="text-base font-bold text-slate-600">cost for eligible patients on Medicare, Medicaid, or ACA private plans</div></div>
+          <div class="bg-white rounded-2xl p-6 border border-slate-200"><div class="text-4xl font-black text-amber-700 mb-2">10 min</div><div class="text-base font-bold text-slate-600">painless scan, no needles, no dye</div></div>
         </div>
+      </div>
+      <div class="p-8 bg-white border-4 border-dashed border-amber-300 text-center rounded-2xl">
+        <h3 class="text-4xl font-black mb-4">Print This Page As a Poster</h3>
+        <p class="text-2xl text-slate-500 mb-8">Check your lung cancer risk free — it's private and takes 30 seconds.</p>
+        <div class="w-56 h-56 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-xl">[ SCAN QR CODE ]</div>
+        <p class="text-sm text-slate-400 mt-6">Replace this box with a QR code linking to your LungIQ site URL before printing.</p>
       </div>
     </div>`;
   } else if (type === 'church') {
@@ -2308,15 +2424,93 @@ function downloadToolkit(type) {
     htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
       <div class="text-center mb-12 border-b-4 border-indigo-600 pb-8">
         <h1 class="text-6xl font-serif font-bold text-indigo-800 mb-4">Faith Partnership Guide</h1>
-        <p class="text-2xl text-slate-600">Bringing health equity to congregations.</p>
+        <p class="text-2xl text-slate-600">A "Lung Sunday" toolkit for congregations that care for the whole person.</p>
       </div>
       <div class="mb-10 p-8 bg-indigo-50 rounded-3xl border border-indigo-200">
-        <h2 class="text-3xl font-bold text-indigo-900 mb-6">Pastor Talking Points</h2>
-        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-indigo-900">
-          <li>Lung cancer is the #1 cause of cancer death, but survival jumps to 80% if caught early.</li>
-          <li>A low-dose CT scan is completely free under Medicare and Medicaid.</li>
-          <li>There are free clinics in our city for the uninsured.</li>
+        <h2 class="text-3xl font-bold text-indigo-900 mb-6">Pastor / Leader Talking Points</h2>
+        <ul class="list-disc pl-10 text-xl space-y-4 font-medium text-indigo-900">
+          <li>Lung cancer takes more lives each year than breast, colon, and prostate cancer combined — but caught early, survival is around 80%.</li>
+          <li>Members age 50+ who currently smoke or used to smoke may qualify for a free annual scan — no cost under Medicare, Medicaid, or most private plans.</li>
+          <li>This isn't about shame — it's about stewardship of the body and being present for the people who need us.</li>
         </ul>
+      </div>
+      <div class="mb-10 p-8 bg-white rounded-3xl border-2 border-indigo-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Sample Bulletin Insert (copy/paste)</h2>
+        <div class="bg-slate-50 rounded-2xl p-8 border border-slate-200 text-lg leading-relaxed italic text-slate-700">
+          "Lung Health Sunday: Did you know a simple, free 10-minute scan can catch lung cancer before symptoms even start? If you're 50+ and currently or formerly smoked, you may qualify at no cost. Stop by the health table after service, or visit [YOUR SITE URL] to check your risk in 30 seconds."
+        </div>
+      </div>
+      <div class="mb-10 p-8 bg-slate-50 rounded-3xl border border-slate-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Planning a "Lung Sunday" Event</h2>
+        <ol class="list-decimal pl-10 text-xl space-y-3 font-medium text-slate-800">
+          <li>Set a date and announce it 2–3 weeks ahead via bulletin and social media.</li>
+          <li>Set up a simple health table with this guide, a tablet/phone to scan risk on the spot, and printed QR codes.</li>
+          <li>Invite a local FQHC or health department rep to answer questions and schedule referrals in person.</li>
+          <li>Follow up the next week — a reminder often makes the difference between "meant to" and "did."</li>
+        </ol>
+      </div>
+      <div class="p-8 bg-white border-4 border-dashed border-indigo-300 text-center rounded-2xl">
+        <h3 class="text-3xl font-black mb-4">Print & Post at the Health Table</h3>
+        <div class="w-56 h-56 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-xl">[ SCAN QR CODE ]</div>
+      </div>
+    </div>`;
+  } else if (type === 'school') {
+    title = "LungIQ Schools & Staff Toolkit";
+    htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
+      <div class="text-center mb-12 border-b-4 border-teal-600 pb-8">
+        <h1 class="text-6xl font-serif font-bold text-teal-800 mb-4">Schools & Staff Room Toolkit</h1>
+        <p class="text-2xl text-slate-600">Reaching parents, grandparents, and staff through the school community.</p>
+      </div>
+      <div class="mb-10 p-8 bg-teal-50 rounded-3xl border border-teal-200">
+        <h2 class="text-3xl font-bold text-teal-900 mb-6">Why Schools?</h2>
+        <p class="text-xl leading-relaxed text-teal-900">Schools reach entire families, not just staff — through newsletters, PTA meetings, and staff rooms. Custodial, cafeteria, and maintenance staff in particular have historically higher smoking rates and lower access to preventive care. A one-page insert can reach hundreds of at-risk adults through people they already trust.</p>
+      </div>
+      <div class="mb-10 p-8 bg-white rounded-3xl border-2 border-teal-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Sample Newsletter / PTA Blurb (copy/paste)</h2>
+        <div class="bg-slate-50 rounded-2xl p-8 border border-slate-200 text-lg leading-relaxed italic text-slate-700">
+          "Family Health Reminder: If you or a grandparent in your household is 50+ and currently or formerly smoked, a free 10-minute lung scan could catch cancer before symptoms start. It's covered at no cost by Medicare, Medicaid, and most insurance plans. Check your risk in 30 seconds at [YOUR SITE URL]."
+        </div>
+      </div>
+      <div class="mb-10 p-8 bg-slate-50 rounded-3xl border border-slate-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Staff Room Poster Copy</h2>
+        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-slate-800">
+          <li>Header: "Free lung cancer risk check — 30 seconds, totally confidential."</li>
+          <li>Subhead: "50+ and smoked? You may qualify for a free annual scan."</li>
+          <li>Footer: District/school wellness contact info, plus the QR code below.</li>
+        </ul>
+      </div>
+      <div class="p-8 bg-white border-4 border-dashed border-teal-300 text-center rounded-2xl">
+        <h3 class="text-3xl font-black mb-4">Print for the Staff Room Bulletin Board</h3>
+        <div class="w-56 h-56 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-xl">[ SCAN QR CODE ]</div>
+      </div>
+    </div>`;
+  } else if (type === 'publicspaces') {
+    title = "LungIQ Public Spaces Poster Kit";
+    htmlContent = `<div class="max-w-4xl mx-auto p-12 font-sans text-slate-800">
+      <div class="text-center mb-12 border-b-4 border-blue-600 pb-8">
+        <h1 class="text-6xl font-serif font-bold text-blue-800 mb-4">Public Spaces Poster Kit</h1>
+        <p class="text-2xl text-slate-600">For pools, libraries, rec centers, laundromats, and other high-traffic spots.</p>
+      </div>
+      <div class="mb-10 p-8 bg-blue-50 rounded-3xl border border-blue-200">
+        <h2 class="text-3xl font-bold text-blue-900 mb-6">Where to Post</h2>
+        <ul class="list-disc pl-10 text-xl space-y-3 font-medium text-blue-900">
+          <li>Public pool / rec center bulletin boards and front-desk counters</li>
+          <li>Public library community boards and check-out desks</li>
+          <li>Laundromats, senior centers, and DMV waiting areas</li>
+          <li>Grocery store community boards and pharmacy waiting areas</li>
+        </ul>
+      </div>
+      <div class="mb-10 p-8 bg-white rounded-3xl border-2 border-blue-200">
+        <h2 class="text-3xl font-bold text-slate-900 mb-6">Front-Desk Script (for staff/volunteers)</h2>
+        <div class="bg-slate-50 rounded-2xl p-8 border border-slate-200 text-lg leading-relaxed italic text-slate-700">
+          "We have a free flyer here about lung cancer screening — if you're 50 or older and have ever smoked, it's worth a look. It's a quick scan that's covered at no cost for most people, and it can catch things early."
+        </div>
+      </div>
+      <div class="p-8 bg-white border-4 border-dashed border-blue-300 text-center rounded-2xl">
+        <h3 class="text-4xl font-black mb-4">Print This Page As a Poster</h3>
+        <p class="text-2xl text-slate-500 mb-8">Free, confidential lung cancer risk check — 30 seconds, from your phone.</p>
+        <div class="w-56 h-56 bg-slate-800 mx-auto rounded-xl flex items-center justify-center text-white font-bold text-xl">[ SCAN QR CODE ]</div>
+        <p class="text-sm text-slate-400 mt-6">Replace this box with a QR code linking to your LungIQ site URL before printing.</p>
       </div>
     </div>`;
   } else if (type === 'factsheet') {
@@ -2352,4 +2546,3 @@ function downloadToolkit(type) {
 </script>
 </body>
 </html>
-
